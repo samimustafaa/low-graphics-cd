@@ -80,6 +80,7 @@ class App:
         self.path = tk.StringVar()
         self.profile = tk.IntVar(value=2)
         self.neutral_sky = tk.BooleanVar(value=True)
+        self.allow_mipmaps = tk.BooleanVar(value=True)
         self.using = tk.StringVar(value="No preset applied yet.")
         self.enabled = tk.BooleanVar(value=True)
         self.passthrough = tk.BooleanVar(value=False)
@@ -91,7 +92,7 @@ class App:
         self.route = 'Graphics'
         self.font = 'Segoe UI' if 'Segoe UI' in tkfont.families(root) else 'Helvetica'
         self.wrapped_labels = []
-        root.title('Texture Lab 1.0.0')
+        root.title('Texture Lab 1.1.0')
         root.geometry(f"1080x{min(790, root.winfo_screenheight() - 80)}")
         root.minsize(960, 660)
         root.configure(bg=BG)
@@ -106,8 +107,10 @@ class App:
         self.sidebar.pack_propagate(False)
         brand = tk.Canvas(self.sidebar, width=60, height=60, bg=PANEL, highlightthickness=0)
         brand.pack(anchor='w', padx=26, pady=(30, 12))
-        brand.create_rectangle(4, 4, 53, 53, fill=ACCENT, outline='')
-        brand.create_text(29, 29, text='TL', font=(self.font, 20, 'bold'), fill=BG)
+        self.logo = tk.PhotoImage(file=str(core.ROOT / 'app-mark.png'))
+        self.small_logo = self.logo.subsample(4)
+        root.iconphoto(True, self.logo)
+        brand.create_image(30, 30, image=self.small_logo)
         self.label(self.sidebar, 'TEXTURE\nLAB', 23, TEXT, True).pack(anchor='w', padx=28)
         self.label(self.sidebar, 'CREATIVE DESTRUCTION', 8, MUTED).pack(anchor='w', padx=28, pady=(9, 38))
         self.nav = {}
@@ -117,7 +120,7 @@ class App:
         bottom = tk.Frame(self.sidebar, bg=PANEL)
         bottom.pack(side='bottom', fill='x', padx=26, pady=28)
         self.label(bottom, 'DESKTOP EDITION', 8, MUTED).pack(anchor='w')
-        self.label(bottom, 'v1.0.0  /  Windows', 10, TEXT).pack(anchor='w', pady=(5, 0))
+        self.label(bottom, 'v1.1.0  /  Windows', 10, TEXT).pack(anchor='w', pady=(5, 0))
         body = tk.Frame(root, bg=BG)
         body.pack(side='left', fill='both', expand=True)
         self.page_canvas = tk.Canvas(body, bg=BG, highlightthickness=0)
@@ -219,6 +222,7 @@ class App:
         self.label(quality, size=9, color=MUTED, textvariable=self.profile_description, wraplength=700).pack(anchor='w')
         self.select(self.profile.get())
         tk.Checkbutton(quality, text='Neutral gray sky in Potato Graphics (requires a game restart)', variable=self.neutral_sky, bg=CARD, fg=TEXT, activebackground=CARD, activeforeground=TEXT, selectcolor=BG, highlightthickness=0).pack(anchor='w', pady=(10, 0))
+        tk.Checkbutton(quality, text='Enable lower mipmaps when the game disables them (Potato Graphics)', variable=self.allow_mipmaps, bg=CARD, fg=TEXT, activebackground=CARD, activeforeground=TEXT, selectcolor=BG, highlightthickness=0).pack(anchor='w', pady=(8, 0))
         foot = tk.Frame(quality, bg=CARD); foot.pack(fill='x', pady=(18, 0))
         self.label(foot, 'Close game → Apply → Launch game.', 9, MUTED).pack(side='left')
         self.button(foot, 'Apply preset', lambda: self.run(self.apply), primary=True).pack(side='right')
@@ -239,7 +243,8 @@ class App:
         self.profile_description.set(desc + (' Characters, weapons and HUD textures may also soften.' if mode == 6 else ''))
 
     def choose_profile(self, mode):
-        if mode == 6: self.neutral_sky.set(True)
+        if mode == 6:
+            self.neutral_sky.set(True); self.allow_mipmaps.set(True)
         self.select(mode)
 
     def saved_label(self, mode, enabled=True, bypass=False):
@@ -268,7 +273,7 @@ class App:
         self.label(self.content, size=9, color=MUTED, textvariable=self.status, wraplength=740).pack(anchor='w', pady=(12, 0))
 
     def about(self):
-        self.heading('DESKTOP EDITION / 1.0.0', 'A smaller, simpler renderer helper.',
+        self.heading('DESKTOP EDITION / 1.1.0', 'A smaller, simpler renderer helper.',
                      'Original source included. No ads, updater, network requests, or game archive patches.')
         frame = self.card(self.content); frame.pack(fill='x')
         text = ('Texture Lab lowers texture detail through four presets. Close the game before applying, then launch it normally.\n\n'
@@ -307,6 +312,7 @@ class App:
                 self.profile.set(mode if mode in core.PRESETS else 2)
                 self.enabled.set(config['enabled']); self.passthrough.set(config['bypass'])
                 self.neutral_sky.set(config['neutral_sky'])
+                self.allow_mipmaps.set(config['allow_mipmaps'])
                 self.saved_label(self.profile.get(), config['enabled'], config['bypass'])
                 self.status.set('Game selected. Install / update replaces older helper versions; close the game first.')
             else:
@@ -324,7 +330,7 @@ class App:
         if core.sha(data) != expected: raise ValueError('The bundled DLL differs from its recorded hash. Extract a fresh package.')
         result = core.install_or_update(exe.parent, data)
         self.load_selected()
-        self.status.set(f'Helper {result} to 1.0.0. Restart the game and test Low first. Native loading and texture changes still need an in-game check.')
+        self.status.set(f'Helper {result} to 1.1.0. Restart the game and test Low first. Native loading and texture changes still need an in-game check.')
 
     def remove(self):
         exe = self.game(); core.require_closed(exe); core.uninstall(exe.parent)
@@ -334,10 +340,11 @@ class App:
 
     def apply(self):
         exe = self.game(); core.require_closed(exe)
-        core.save_preset(exe.parent, self.profile.get(), self.enabled.get(), neutral_sky=self.neutral_sky.get())
+        core.save_preset(exe.parent, self.profile.get(), self.enabled.get(), neutral_sky=self.neutral_sky.get(), allow_mipmaps=self.allow_mipmaps.get())
         self.saved_label(self.profile.get(), self.enabled.get())
         self.passthrough.set(False)
-        self.status.set('Preset saved. Launch the game to use it. Gray sky only applies to recognized sky shaders; check Diagnostics for matches.')
+        self.status.set(self.using.get() + '. Close the app if you want, then launch the game normally.')
+        self.page_canvas.yview_moveto(0)
 
     def save_passthrough(self):
         exe = self.game(); core.require_closed(exe)
@@ -381,7 +388,9 @@ def main():
     if os.name != 'nt': raise SystemExit('Run Texture Lab on Windows.')
     # DPI awareness affects this GUI process only, not the game.
     import ctypes
-    try: ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('sg0hann.TextureLab')
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
     except (OSError, AttributeError): pass
     root = tk.Tk(); app = App(root)
     import sys

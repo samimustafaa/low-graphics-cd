@@ -30,9 +30,9 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(config.read_bytes(), b"original compiled game config")
         self.assertEqual(list(self.folder.iterdir()), [config])
 
-    def test_compatibility_presets_disable_all_forced_mipmap_controls(self):
+    def test_only_potato_allows_optional_mip_filter(self):
         m.install(self.folder, self.dll)
-        for mode, expected in [(6, ("32", "0", "0", "0")),
+        for mode, expected in [(6, ("32", "0", "0", "1")),
                                (4, ("128", "0", "0", "0")),
                                (0, ("256", "0", "0", "0"))]:
             m.apply_bias(self.folder, mode)
@@ -45,7 +45,7 @@ class ManagerTests(unittest.TestCase):
     def test_flat_cannot_be_selected_in_recovery_build(self):
         with self.assertRaises(ValueError): m.settings(8)
 
-    def test_stronger_profiles_round_trip_without_forcing_mip_filters(self):
+    def test_profiles_round_trip_and_gate_mipmaps_to_potato(self):
         for mode, bias, size in [(0, 0, 256), (2, 2, 256),
                                  (4, 10, 128), (6, 15, 32)]:
             parser = configparser.ConfigParser()
@@ -54,7 +54,7 @@ class ManagerTests(unittest.TestCase):
             values = {'bias': int(cfg['Bias']), 'size': int(cfg['MinTextureSize'])}
             self.assertEqual(values, {'bias': bias, 'size': size})
             self.assertEqual(m.preset_from_settings(values), mode)
-            self.assertEqual(cfg['ForceMipFilter'], '0')
+            self.assertEqual(cfg['ForceMipFilter'], str(int(mode == 6)))
             self.assertEqual(cfg['CoarsestMip'], '0')
         self.assertEqual(m.preset_from_settings({'bias': 4, 'size': 256}), 4)
         self.assertEqual(m.preset_from_settings({'bias': 4, 'size': 64}), 6)
@@ -65,6 +65,7 @@ class ManagerTests(unittest.TestCase):
             self.assertIn(f"NeutralSky={int(mode == 6)}".encode(), data)
             self.assertIn(f"IncludeAutogen={int(mode == 6)}".encode(), data)
         self.assertIn(b"NeutralSky=0", m.settings(6, neutral_sky=False))
+        self.assertIn(b"ForceMipFilter=0", m.settings(6, allow_mipmaps=False))
 
     def test_default_install_uses_former_potato_as_low(self):
         m.install(self.folder, self.dll)
@@ -84,7 +85,7 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(result, "updated")
         self.assertEqual((self.folder / m.DLL).read_bytes(), b"replacement DLL")
         self.assertEqual(game.read_bytes(), b"game stays original")
-        self.assertEqual(json.loads(manifest.read_text())["build_version"], "1.0.0")
+        self.assertEqual(json.loads(manifest.read_text())["build_version"], "1.1.0")
         self.assertEqual(list(self.folder.glob("TextureLab_recovery_*")), [])
 
     def test_failed_update_rolls_back_dll_settings_and_manifest(self):

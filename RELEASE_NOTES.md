@@ -1,12 +1,13 @@
-Texture Lab 1.0.0 packages the control app as a standalone Windows executable and a per-user installer. Python is included.
+Texture Lab 1.1.0 focuses on the Potato Graphics renderer path and the selected TL icon.
 
-- Four presets: Normal, Low (former Potato), Ultra (unchanged), and Potato Graphics (formerly Wide).
-- Potato Graphics requests +15 mip bias, covers textures down to 32 pixels and allows ordinary autogen mipmaps. Render targets/depth textures remain excluded.
-- Optional neutral gray output for sky shaders recognized from their sky-specific metadata. Unrecognized shaders remain unchanged; replacement failures retain the original shader.
-- Minimal dark/gray interface, animated hover/press buttons, persistent saved-preset label, and red game-exit notice.
-- The game must be closed before Apply. Settings are read at startup, removing periodic INI reads from the rendering path.
-- Restore-original, hash checks, upgrade rollback and diagnostic export remain available.
+- Potato Graphics now preserves the requested reduction when the game writes sampler bias after binding a texture. Previously those later writes could undo the reduction.
+- New optional mipmap correction enables POINT mipmap sampling on eligible textures when the game requests NONE. This can address detailed buildings/trees/distant surfaces whose mipmaps were not being used. It leaves existing LINEAR/POINT filters alone, skips single-level/render-target/depth textures and falls back on API failure.
+- Added call-order, restoration, filtering-rejection, state-block and coverage regression tests, plus a real Windows sampler-state probe when a device is available.
+- The chosen TL icon is embedded in the app/installer and shown in the sidebar/window.
+- Apply shows “You are using {preset} textures” in both the persistent label and status area and scrolls to the label. The game must be closed.
+- Diagnostics now count corrected late writes, disabled-mipmap requests, optional filter changes and binds without eligible mipmaps.
+- Ultra and Low retain their existing preset values and late-write behavior. Normal/off avoids texture-metadata queries. Gray-sky behavior is unchanged.
 
-Install `TextureLab-Setup-1.0.0.exe`, open the app, choose client.exe, Install / update, select a preset and Apply while the game is closed. Then launch the game normally. `TextureLab-1.0.0.exe` is the portable alternative.
+Install TextureLab-Setup-1.1.0.exe, close the game, select client.exe, click Install / update, select Potato Graphics and Apply, then relaunch. The optional mipmap checkbox can be disabled separately if it causes visual issues.
 
-Sky recognition needs retained shader metadata and may not match every client. Texture reduction can also blur HUD/characters and does not selectively provide an exact 50% detail setting. Original texture allocations and geometry remain. FPS/stutter improvements are hardware dependent and have not been measured in Creative Destruction for this release. Use Restore original before uninstalling the control app. Binaries are unsigned; SHA256SUMS.txt is provided for integrity verification.
+These fixes address concrete renderer-state gaps; they do not prove that every building/tree/distant texture is reduced in every client. Non-mipmapped assets cannot be reduced by this method. Exact 50% reduction only for skins/weapons/pickaxes needs asset identification that this helper does not have. FPS and frame-time gains have not been measured in the target game. Binaries are unsigned; SHA256SUMS.txt verifies integrity.

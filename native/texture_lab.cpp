@@ -1,4 +1,4 @@
-// Texture Lab 1.0.0. Public COM forwarding wrappers. System objects, private
+// Texture Lab 1.1.0. Public COM forwarding wrappers. System objects, private
 // runtime layouts and runtime vtables are never modified. Original MIT source.
 #define CINTERFACE
 #define COBJMACROS
@@ -47,14 +47,14 @@ static BOOL CALLBACK initialize(PINIT_ONCE, PVOID, PVOID*) {
     HMODULE pinned;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,
                       (LPCWSTR)selfModule,&pinned);
-    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.0.0 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
+    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.1.0 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
     logLine(line); return TRUE;
 }
 static FARPROC resolve(const char* name) {
     InitOnceExecuteOnce(&initOnce,initialize,nullptr,nullptr);
     return systemD3D?GetProcAddress(systemD3D,name):nullptr;
 }
-struct Config { bool enabled; int bias; UINT minSize; bool bypass; bool neutralSky, includeAutogen; };
+struct Config { bool enabled; int bias; UINT minSize; bool bypass; bool neutralSky, includeAutogen, allowMipmaps; };
 static Config readConfig() {
     int bias=(int)GetPrivateProfileIntW(L"TextureLab",L"Bias",2,iniPath);
     int size=(int)GetPrivateProfileIntW(L"TextureLab",L"MinTextureSize",256,iniPath);
@@ -62,7 +62,8 @@ static Config readConfig() {
     return {GetPrivateProfileIntW(L"TextureLab",L"Enabled",1,iniPath)!=0 && !bypass,
             bias<0?0:(bias>15?15:bias),(UINT)(size<32?32:(size>4096?4096:size)),bypass,
             GetPrivateProfileIntW(L"TextureLab",L"NeutralSky",0,iniPath)!=0,
-            GetPrivateProfileIntW(L"TextureLab",L"IncludeAutogen",0,iniPath)!=0};
+            GetPrivateProfileIntW(L"TextureLab",L"IncludeAutogen",0,iniPath)!=0,
+            GetPrivateProfileIntW(L"TextureLab",L"ForceMipFilter",0,iniPath)!=0};
 }
 struct CallGuard {
     bool outer;
@@ -73,14 +74,17 @@ struct CallGuard {
 };
 constexpr size_t deviceSlots=sizeof(IDirect3DDevice9ExVtbl)/sizeof(void*);
 constexpr size_t factorySlots=sizeof(IDirect3D9ExVtbl)/sizeof(void*);
-struct Sampler { DWORD requested; bool applied; DWORD appliedValue; };
+struct Sampler {
+    DWORD requested; bool applied; DWORD appliedValue;
+    bool eligible, filterApplied; DWORD requestedFilter, appliedFilter;
+};
 struct DeviceContext {
     const IDirect3DDevice9Vtbl* lpVtbl;
     IDirect3DDevice9* real; const IDirect3DDevice9Vtbl* original;
     void* entries[deviceSlots]; volatile LONG refs; bool ex;
     volatile LONG callbacks, dead, blocked, recording, renderThread;
     Config config; ULONGLONG lastPoll, nextLog;
-    unsigned long eligibleBinds, modifications, failures, otherThread, shaderChecks, graySkies;
+    unsigned long eligibleBinds, modifications, failures, otherThread, shaderChecks, graySkies, lateBiasWrites, disabledMipWrites, mipChanges, noMipBinds;
     Sampler samplers[16];
 };
 struct FactoryContext {
@@ -158,8 +162,8 @@ static void poll(DeviceContext* c) {
     ULONGLONG now=GetTickCount64();
     // Settings change only between game sessions; no per-bind INI reads.
     if(now>=c->nextLog) {
-        char line[240]; snprintf(line,sizeof(line),"pid=%lu thread=%ld bias=%d enabled=%d eligible=%lu changed=%lu failed=%lu other_thread=%lu blocked=%ld shaders=%lu gray_skies=%lu",
-            GetCurrentProcessId(),c->renderThread,c->config.bias,c->config.enabled,c->eligibleBinds,c->modifications,c->failures,c->otherThread,c->blocked,c->shaderChecks,c->graySkies);
+        char line[240]; snprintf(line,sizeof(line),"pid=%lu thread=%ld bias=%d enabled=%d eligible=%lu changed=%lu failed=%lu other_thread=%lu blocked=%ld shaders=%lu gray_skies=%lu late_bias=%lu disabled_mip=%lu mip_changes=%lu no_mips=%lu",
+            GetCurrentProcessId(),c->renderThread,c->config.bias,c->config.enabled,c->eligibleBinds,c->modifications,c->failures,c->otherThread,c->blocked,c->shaderChecks,c->graySkies,c->lateBiasWrites,c->disabledMipWrites,c->mipChanges,c->noMipBinds);
         logLine(line); c->nextLog=now+10000;
     }
 }
@@ -188,46 +192,108 @@ static void apply(DeviceContext* c,DWORD slot,DWORD value) {
         logLine("Sampler override rejected; extra overrides suspended until a successful device reset.");
     }
 }
+static DWORD desiredFilter(DeviceContext* c,Sampler& state,bool eligible) {
+    return c->config.enabled && c->config.bias && c->config.allowMipmaps && eligible &&
+           state.requestedFilter==D3DTEXF_NONE ? (DWORD)D3DTEXF_POINT : state.requestedFilter;
+}
+static void applyFilter(DeviceContext* c,DWORD slot,bool eligible) {
+    auto& state=c->samplers[slot];DWORD value=desiredFilter(c,state,eligible);
+    if(!((value!=state.requestedFilter) || (state.filterApplied && state.appliedFilter!=state.requestedFilter)))return;
+    if(state.filterApplied && state.appliedFilter==value)return;
+    HRESULT hr=c->original->SetSamplerState(c->real,slot,D3DSAMP_MIPFILTER,value);
+    if(SUCCEEDED(hr)){state.filterApplied=true;state.appliedFilter=value;++c->mipChanges;}
+    else {
+        // Optional filter failed: retry the game's original value and turn only
+        // this option off. Do not convert a valid game call into an error.
+        c->original->SetSamplerState(c->real,slot,D3DSAMP_MIPFILTER,state.requestedFilter);
+        c->config.allowMipmaps=false;state.filterApplied=false;++c->failures;
+        logLine("Optional mip filter rejected; original filter retained and option suspended.");
+    }
+}
 static HRESULT STDMETHODCALLTYPE texture(IDirect3DDevice9* d,DWORD slot,IDirect3DBaseTexture9* t) {
     auto c=ctx(d); Hold<DeviceContext> hold(c); CallGuard entry;
     HRESULT hr=c->original->SetTexture(c->real,slot,t);
     if(!entry.outer || FAILED(hr) || slot>=16 || c->blocked || c->recording || !ownsThread(c)) return hr;
     poll(c);
     bool eligible=false;
-    if(t && IDirect3DBaseTexture9_GetType(t)==D3DRTYPE_TEXTURE && (IDirect3DBaseTexture9_GetLevelCount(t)>1 || c->config.includeAutogen)) {
+    // Normal/off sessions avoid metadata queries entirely.
+    if(!c->config.enabled || !c->config.bias) {
+        auto& state=c->samplers[slot];state.eligible=false;
+        if(state.applied && state.appliedValue!=state.requested)apply(c,slot,state.requested);
+        applyFilter(c,slot,false);return hr;
+    }
+    UINT levels=t?IDirect3DBaseTexture9_GetLevelCount(t):0;
+    if(t && IDirect3DBaseTexture9_GetType(t)==D3DRTYPE_TEXTURE && (levels>1 || c->config.includeAutogen)) {
         D3DSURFACE_DESC desc;
         if(SUCCEEDED(IDirect3DTexture9_GetLevelDesc((IDirect3DTexture9*)t,0,&desc)))
             eligible=!(desc.Usage&(D3DUSAGE_RENDERTARGET|D3DUSAGE_DEPTHSTENCIL)) &&
                 (!(desc.Usage&D3DUSAGE_AUTOGENMIPMAP) || c->config.includeAutogen) &&
-                (IDirect3DBaseTexture9_GetLevelCount(t)>1 || (c->config.includeAutogen && (desc.Usage&D3DUSAGE_AUTOGENMIPMAP))) &&
+                (levels>1 || (c->config.includeAutogen && (desc.Usage&D3DUSAGE_AUTOGENMIPMAP))) &&
                 desc.Width>=c->config.minSize && desc.Height>=c->config.minSize;
     }
-    if(eligible) ++c->eligibleBinds;
+    if(eligible) ++c->eligibleBinds;else if(t && levels<=1)++c->noMipBinds;
+    c->samplers[slot].eligible=eligible;
     auto& sampler=c->samplers[slot]; DWORD value=desired(c,slot,eligible);
     // Write on eligible binds (state blocks may change actual runtime values).
     // Restore only if this helper has previously changed this sampler.
     if((eligible && c->config.enabled && c->config.bias) ||
        (sampler.applied && sampler.appliedValue!=sampler.requested)) apply(c,slot,value);
+    if(!c->blocked)applyFilter(c,slot,eligible);
     return hr;
 }
 static HRESULT STDMETHODCALLTYPE sampler(IDirect3DDevice9* d,DWORD slot,D3DSAMPLERSTATETYPE type,DWORD value) {
     auto c=ctx(d); Hold<DeviceContext> hold(c); CallGuard entry;
-    // Forward the game's call exactly. Apply bias on the next SetTexture bind;
-    // do not add unexpected state changes inside the game's state-block calls.
-    HRESULT hr=c->original->SetSamplerState(c->real,slot,type,value);
-    if(entry.outer && SUCCEEDED(hr) && slot<16 && type==D3DSAMP_MIPMAPLODBIAS && !c->blocked && !c->recording &&
-       (!c->renderThread || (DWORD)c->renderThread==GetCurrentThreadId())) {
-        c->samplers[slot].requested=value; c->samplers[slot].applied=false;
+    bool track=entry.outer && slot<16 && !c->blocked && !c->recording &&
+        (!c->renderThread || (DWORD)c->renderThread==GetCurrentThreadId());
+    if(!track || (type!=D3DSAMP_MIPMAPLODBIAS && type!=D3DSAMP_MIPFILTER))
+        return c->original->SetSamplerState(c->real,slot,type,value);
+    auto& state=c->samplers[slot];Sampler previous=state;
+    if(type==D3DSAMP_MIPMAPLODBIAS)state.requested=value;else state.requestedFilter=value;
+    DWORD effective=type==D3DSAMP_MIPMAPLODBIAS?
+        (c->config.includeAutogen?desired(c,slot,state.eligible):value):desiredFilter(c,state,state.eligible);
+    // Handle both call orders: SetSamplerState may follow SetTexture.
+    HRESULT hr=c->original->SetSamplerState(c->real,slot,type,effective);
+    if(FAILED(hr)) {
+        state=previous;
+        if(effective!=value){
+            ++c->failures;
+            if(type==D3DSAMP_MIPFILTER)c->config.allowMipmaps=false;else InterlockedExchange(&c->blocked,1);
+            hr=c->original->SetSamplerState(c->real,slot,type,value);
+            if(SUCCEEDED(hr)) {
+                if(type==D3DSAMP_MIPMAPLODBIAS){state.requested=value;state.applied=false;}
+                else {state.requestedFilter=value;state.filterApplied=false;}
+            }
+        }
+        return hr;
+    }
+    if(type==D3DSAMP_MIPMAPLODBIAS){
+        state.applied=effective!=value;state.appliedValue=effective;
+        if(effective!=value){++c->modifications;++c->lateBiasWrites;}
+    }else{
+        state.filterApplied=effective!=value;state.appliedFilter=effective;
+        if(value==D3DTEXF_NONE)++c->disabledMipWrites;
+        if(effective!=value)++c->mipChanges;
     }
     return hr;
 }
+
 static HRESULT STDMETHODCALLTYPE beginBlock(IDirect3DDevice9* d) {
     auto c=ctx(d); Hold<DeviceContext> hold(c);
-    HRESULT hr=c->original->BeginStateBlock(c->real); if(SUCCEEDED(hr)) InterlockedExchange(&c->recording,1); return hr;
+    // Restore our own overrides before recording starts, so state blocks do
+    // not capture helper values or carry them onto an excluded render target.
+    if(!c->recording && !c->blocked && (!c->renderThread || (DWORD)c->renderThread==GetCurrentThreadId())) {
+        for(DWORD slot=0;slot<16;++slot){
+            auto& state=c->samplers[slot];
+            if(state.applied && state.appliedValue!=state.requested)apply(c,slot,state.requested);
+            if(!c->blocked)applyFilter(c,slot,false);
+            state.eligible=false;
+        }
+    }
+    HRESULT hr=c->original->BeginStateBlock(c->real); if(SUCCEEDED(hr)){InterlockedExchange(&c->recording,1);for(auto& s:c->samplers)s.eligible=false;} return hr;
 }
 static HRESULT STDMETHODCALLTYPE endBlock(IDirect3DDevice9* d,IDirect3DStateBlock9** out) {
     auto c=ctx(d); Hold<DeviceContext> hold(c);
-    HRESULT hr=c->original->EndStateBlock(c->real,out); if(SUCCEEDED(hr)) InterlockedExchange(&c->recording,0); return hr;
+    HRESULT hr=c->original->EndStateBlock(c->real,out); if(SUCCEEDED(hr)){InterlockedExchange(&c->recording,0);for(auto& s:c->samplers){s.eligible=false;s.applied=false;s.filterApplied=false;}} return hr;
 }
 static void afterReset(DeviceContext* c,HRESULT hr) {
     if(SUCCEEDED(hr)) {

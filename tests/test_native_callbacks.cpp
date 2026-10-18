@@ -5,11 +5,17 @@
 #ifdef TEXTURELAB_HOST_TEST
 #include <thread>
 #endif
-struct FakeDevice { const IDirect3DDevice9Vtbl* lpVtbl; DWORD value; int writes; bool failReset; ULONG refs; bool nested; };
+struct FakeDevice { const IDirect3DDevice9Vtbl* lpVtbl; DWORD value; int writes; bool failReset; ULONG refs; bool nested; DWORD filter; };
 static IDirect3DDevice9Vtbl realTable;
 static IDirect3DDevice9* reentryTarget;
 static HRESULT STDMETHODCALLTYPE noQI(IDirect3DDevice9*,REFIID,void** out) { *out=nullptr;return E_NOINTERFACE; }
-static HRESULT STDMETHODCALLTYPE setSampler(IDirect3DDevice9* d,DWORD,D3DSAMPLERSTATETYPE,DWORD value) { auto f=(FakeDevice*)d;f->value=value;++f->writes;return S_OK; }
+static bool rejectPoint=false;
+static HRESULT STDMETHODCALLTYPE setSampler(IDirect3DDevice9* d,DWORD,D3DSAMPLERSTATETYPE type,DWORD value) {
+    auto f=(FakeDevice*)d;
+    if(type==D3DSAMP_MIPFILTER){if(rejectPoint && value==D3DTEXF_POINT)return D3DERR_INVALIDCALL;f->filter=value;}
+    else f->value=value;
+    ++f->writes;return S_OK;
+}
 static HRESULT STDMETHODCALLTYPE setTexture(IDirect3DDevice9* d,DWORD,IDirect3DBaseTexture9*) {
     auto f=(FakeDevice*)d;
     if(f->nested) { f->nested=false; IDirect3DDevice9_SetTexture(reentryTarget,0,nullptr); }
@@ -115,6 +121,28 @@ int main() {
     textureUsage=D3DUSAGE_AUTOGENMIPMAP;ctx(d)->config.includeAutogen=false;
     IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);assert(first.value==0);
     textureUsage=0;textureLevels=8;textureSize=512;
+    // A late game write must not undo reduction before the draw.
+    ctx(d)->config.allowMipmaps=true;ctx(d)->config.includeAutogen=true;
+    IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);
+    assert(first.filter==D3DTEXF_POINT);
+    IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPMAPLODBIAS,0);
+    assert(first.value==floatBits(15.0f));assert(ctx(d)->lateBiasWrites>0);
+    IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPFILTER,D3DTEXF_NONE);
+    assert(first.filter==D3DTEXF_POINT);
+    IDirect3DDevice9_SetTexture(d,0,nullptr);
+    assert(first.value==0 && first.filter==D3DTEXF_NONE);
+    // Keep a game's existing mip filter and never force it on a one-level texture.
+    IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPFILTER,D3DTEXF_LINEAR);
+    IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);assert(first.filter==D3DTEXF_LINEAR);
+    IDirect3DDevice9_SetTexture(d,0,nullptr);
+    IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPFILTER,D3DTEXF_NONE);
+    textureLevels=1;IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);
+    assert(first.filter==D3DTEXF_NONE && first.value==0);textureLevels=8;
+    // Optional filter rejection must preserve the game's valid HRESULT/value.
+    IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);
+    rejectPoint=true;
+    assert(SUCCEEDED(IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPFILTER,D3DTEXF_NONE)));
+    assert(first.filter==D3DTEXF_NONE && !ctx(d)->config.allowMipmaps);rejectPoint=false;
     // Normal/off restores the game's tracked value on the next texture bind.
     ctx(d)->config.enabled=false;IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);
     assert(first.value==0);
@@ -135,5 +163,5 @@ int main() {
 #ifdef TEXTURELAB_HOST_TEST
     assert(contextAllocations==0);
 #endif
-    puts("PASS: production COM wrappers, unchanged private runtime tables, real-pointer forwarding, COM identity/refcounts, sampler restoration, state-block recording, failed/successful reset, re-entry, final release, 2000 create/release cycles");
+    puts("PASS: production COM wrappers, unchanged private runtime tables, real-pointer forwarding, COM identity/refcounts, both sampler call orders, disabled-mipmap correction/fallback, single-level exclusions, sampler restoration, state-block recording, failed/successful reset, re-entry, final release, 2000 create/release cycles");
 }

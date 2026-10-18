@@ -4,7 +4,7 @@ A minimal Windows graphics control app for the 32-bit Direct3D 9 version of Crea
 
 ## Install
 
-Download **TextureLab-Setup-1.0.0.exe** from [Releases](https://github.com/samimustafaa/low-graphics-cd/releases). Install and open it. Python is included; no terminal commands are needed. The standalone `TextureLab-1.0.0.exe` is an alternative if you prefer no installation.
+Download **TextureLab-Setup-1.1.0.exe** from [Releases](https://github.com/samimustafaa/low-graphics-cd/releases). Install and open it. Python is included; no terminal commands are needed. The standalone `TextureLab-1.1.0.exe` is an alternative if you prefer no installation.
 
 1. Close the game completely.
 2. Browse to your actual `client.exe`.
@@ -21,7 +21,15 @@ Download **TextureLab-Setup-1.0.0.exe** from [Releases](https://github.com/samim
 | Ultra | +10 bias on eligible textures ≥128 pixels; unchanged from 0.6 | Original |
 | Potato Graphics | +15 bias on eligible textures ≥32 pixels, including ordinary autogen mipmaps | Optional neutral gray on recognized sky shaders |
 
-Potato Graphics replaces Wide. Its broader coverage can soften buildings, trees, characters, skins, weapons, tools and interface atlases. The helper cannot reliably separate those asset categories or promise an exact “50% detail” only for characters/weapons. It requests existing lower mipmaps; it does not delete geometry or rewrite original texture files. Single-level textures without generated mipmaps, render targets and depth textures stay unchanged. Drivers can clamp requested bias, and textures already using their smallest mipmap cannot get simpler through bias alone.
+Potato Graphics replaces Wide. Version 1.1 preserves its bias even when the game writes sampler state after binding a texture, and can enable POINT mipmap sampling on eligible textures when the game requests NONE. This corrects two renderer paths which could leave nearby or distant surfaces detailed despite the selected preset. The optional filter has its own checkbox; Ultra/Low retain their previous late-write behavior. This does not prove which render path your client uses. Its broader coverage can soften buildings, trees, characters, skins, weapons, tools and interface atlases. The helper cannot reliably separate those asset categories or promise an exact “50% detail” only for characters/weapons. It requests existing lower mipmaps; it does not delete geometry or rewrite original texture files. Single-level textures without generated mipmaps, render targets and depth textures stay unchanged. No new lower-resolution textures are generated. Drivers can clamp requested bias, and textures already using their smallest mipmap cannot get simpler through bias alone.
+
+## Texture coverage and diagnostics
+
+The new mipmap option is **only for Potato Graphics**. It leaves the game's existing LINEAR/POINT filters alone, excludes render-target/depth and non-mipmapped textures, restores tracked original values when an eligible texture is unbound, and falls back if the optional filter request fails. It does not change minification/magnification filters or force a minimum mip level. Normal/off avoids texture-metadata queries.
+
+The log includes `late_bias` (late game bias writes corrected), `disabled_mip` (game requests for no mipmap filtering), `mip_changes` (optional mip-filter changes), and `no_mips` (binds without an eligible mip chain). These help distinguish an unapplied override from textures that have no lower-detail levels. They do not identify asset names or prove FPS improvements.
+
+The chosen TL icon is used in the app, window/taskbar resources and installer. After Apply, the exact saved preset is shown both at the top and in the status area; selecting a different card alone does not change that saved label.
 
 ## Neutral sky
 
@@ -39,7 +47,7 @@ Windows 10/11 and a 32-bit x86 Direct3D 9 client are required. Existing ReShade/
 
 ## Build and validation
 
-Source is MIT licensed; see `LICENSE.txt`. The tag-triggered [release workflow](.github/workflows/release.yml) builds the x86 DLL, runs Python/Tk tests and native sanitizer tests on Linux, executes SDK-native tests on Windows, tests real Direct3D factory forwarding and shader tokens against Microsoft's assembler, then builds the standalone GUI with PyInstaller and the per-user installer with Inno Setup. Portable/installed app smoke tests and silent install/uninstall tests must pass before the release job runs.
+Source is MIT licensed; see `LICENSE.txt`. The tag-triggered [release workflow](.github/workflows/release.yml) builds the x86 DLL, runs Python/Tk tests and native sanitizer tests on Linux, executes SDK-native tests on Windows, attempts a real device/texture sampler-state test (explicitly skipped if no device is available), tests real Direct3D factory forwarding and shader tokens against Microsoft's assembler, then builds the standalone GUI with PyInstaller and the per-user installer with Inno Setup. Portable/installed app smoke tests and silent install/uninstall tests must pass before the release job runs.
 
 Versions 0.5 and 0.6 were reported working by the user. Those reports do not establish the compatibility or performance of this release's new aggressive coverage and gray-sky path. Automated tests do not replace real gameplay on the target GPU/client. Check the workflow result for actual build/test outcomes.
 

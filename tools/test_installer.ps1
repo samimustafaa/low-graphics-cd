@@ -5,7 +5,7 @@ if (!$p.WaitForExit(45000)) { $p.Kill(); throw 'Packaged app did not finish smok
 if ($p.ExitCode -ne 0 -or !(Test-Path $smoke)) { throw 'Packaged app failed smoke test' }
 Get-Content $smoke
 $target = Join-Path $env:TEMP 'TextureLab-install-test'
-$p = Start-Process -FilePath "$PWD\release\TextureLab-Setup-1.0.0.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$target`"" -Wait -PassThru
+$p = Start-Process -FilePath "$PWD\release\TextureLab-Setup-1.1.0.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$target`"" -Wait -PassThru
 if ($p.ExitCode -ne 0 -or !(Test-Path "$target\TextureLab.exe")) { throw 'Silent installer failed' }
 $installed = Join-Path $env:TEMP 'TextureLab-installed-smoke.json'
 $p = Start-Process -FilePath "$target\TextureLab.exe" -ArgumentList '--smoke-test', "`"$installed`"" -PassThru
