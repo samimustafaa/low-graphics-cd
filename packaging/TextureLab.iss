@@ -1,4 +1,4 @@
-#define AppVersion "1.5.1"
+#define AppVersion "1.6.0"
 [Setup]
 AppId={{5AF53953-9946-4A0A-BD65-2ED4641369B1}
 AppName=Texture Lab

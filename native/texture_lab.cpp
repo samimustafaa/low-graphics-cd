@@ -1,4 +1,4 @@
-// Texture Lab 1.5.1. Public COM forwarding wrappers. System objects, private
+// Texture Lab 1.6.0. Public COM forwarding wrappers. System objects, private
 // runtime layouts and runtime vtables are never modified. Original MIT source.
 #define CINTERFACE
 #define COBJMACROS
@@ -47,7 +47,7 @@ static BOOL CALLBACK initialize(PINIT_ONCE, PVOID, PVOID*) {
     HMODULE pinned;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,
                       (LPCWSTR)selfModule,&pinned);
-    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.5.1 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
+    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.6.0 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
     logLine(line); return TRUE;
 }
 static FARPROC resolve(const char* name) {
@@ -84,6 +84,7 @@ struct Sampler {
     bool eligible, filterApplied; DWORD requestedFilter, appliedFilter;
     DWORD requestedMip, appliedMip; bool mipApplied; UINT maxMip;
 };
+struct SkyBinding {IDirect3DPixelShader9* source;IDirect3DPixelShader9* replacement;};
 struct DeviceContext {
     const IDirect3DDevice9Vtbl* lpVtbl;
     IDirect3DDevice9* real; const IDirect3DDevice9Vtbl* original;
@@ -92,6 +93,8 @@ struct DeviceContext {
     Config config; ULONGLONG lastPoll, nextLog;
     unsigned long eligibleBinds, modifications, failures, otherThread, shaderChecks, graySkies, lateBiasWrites, disabledMipWrites, mipChanges, noMipBinds, mipFloorChanges, flatGrounds, hiddenGrass;
     Sampler samplers[16];
+    SkyBinding skyBindings[256];
+    unsigned long skyBindReads, skyBindMatches, skyBindMisses;
 };
 struct FactoryContext {
     const IDirect3D9Vtbl* lpVtbl;
@@ -196,8 +199,8 @@ static void poll(DeviceContext* c) {
     ULONGLONG now=GetTickCount64();
     // Settings change only between game sessions; no per-bind INI reads.
     if(now>=c->nextLog) {
-        char line[384]; snprintf(line,sizeof(line),"pid=%lu thread=%ld bias=%d enabled=%d eligible=%lu changed=%lu failed=%lu other_thread=%lu blocked=%ld shaders=%lu gray_skies=%lu late_bias=%lu disabled_mip=%lu mip_changes=%lu no_mips=%lu mip_floor=%lu flat_ground=%lu hidden_grass=%lu",
-            GetCurrentProcessId(),c->renderThread,c->config.bias,c->config.enabled,c->eligibleBinds,c->modifications,c->failures,c->otherThread,c->blocked,c->shaderChecks,c->graySkies,c->lateBiasWrites,c->disabledMipWrites,c->mipChanges,c->noMipBinds,c->mipFloorChanges,c->flatGrounds,c->hiddenGrass);
+        char line[512]; snprintf(line,sizeof(line),"pid=%lu thread=%ld bias=%d enabled=%d eligible=%lu changed=%lu failed=%lu other_thread=%lu blocked=%ld shaders=%lu gray_skies=%lu late_bias=%lu disabled_mip=%lu mip_changes=%lu no_mips=%lu mip_floor=%lu flat_ground=%lu hidden_grass=%lu sky_bind_reads=%lu sky_bind_matches=%lu sky_bind_misses=%lu",
+            GetCurrentProcessId(),c->renderThread,c->config.bias,c->config.enabled,c->eligibleBinds,c->modifications,c->failures,c->otherThread,c->blocked,c->shaderChecks,c->graySkies,c->lateBiasWrites,c->disabledMipWrites,c->mipChanges,c->noMipBinds,c->mipFloorChanges,c->flatGrounds,c->hiddenGrass,c->skyBindReads,c->skyBindMatches,c->skyBindMisses);
         logLine(line); c->nextLog=now+10000;
     }
 }
@@ -207,6 +210,7 @@ static bool ownsThread(DeviceContext* c) {
     if(owner && owner!=thread) { InterlockedIncrement((volatile LONG*)&c->otherThread); return false; }
     return true;
 }
+#include "sky_binding.inc"
 static DWORD desired(DeviceContext* c,DWORD slot,bool eligible) {
     DWORD original=c->samplers[slot].requested;
     if(!c->config.enabled || !eligible || !c->config.bias) return original;
@@ -365,6 +369,7 @@ static void afterReset(DeviceContext* c,HRESULT hr) {
 }
 static HRESULT STDMETHODCALLTYPE reset(IDirect3DDevice9* d,D3DPRESENT_PARAMETERS* p) {
     auto c=ctx(d); Hold<DeviceContext> hold(c); InterlockedExchange(&c->blocked,1);
+    // Shader objects survive Reset; retain cached shader references.
     HRESULT hr=c->original->Reset(c->real,p); afterReset(c,hr); return hr;
 }
 static HRESULT STDMETHODCALLTYPE resetEx(IDirect3DDevice9Ex* d,D3DPRESENT_PARAMETERS* p,D3DDISPLAYMODEEX* mode) {
@@ -373,9 +378,12 @@ static HRESULT STDMETHODCALLTYPE resetEx(IDirect3DDevice9Ex* d,D3DPRESENT_PARAME
 }
 static ULONG STDMETHODCALLTYPE releaseDevice(IDirect3DDevice9* d) {
     auto c=ctx(d); Hold<DeviceContext> hold(c);
-    c->original->Release(c->real);
     ULONG refs=(ULONG)InterlockedDecrement(&c->refs);
-    if(!refs) InterlockedExchange(&c->dead,1); return refs;
+    if(!refs){
+        if(c->config.neutralSky){char summary[160];snprintf(summary,sizeof(summary),"Sky bind summary: reads=%lu matches=%lu unknown=%lu",c->skyBindReads,c->skyBindMatches,c->skyBindMisses);logLine(summary);}
+        clearSkyBindings(c);InterlockedExchange(&c->dead,1);
+    }
+    c->original->Release(c->real);return refs;
 }
 static void fillDeviceTable(DeviceContext*);
 static void fillFactoryTable(FactoryContext*);
@@ -384,6 +392,7 @@ static IDirect3DDevice9* attachDevice(IDirect3DDevice9* d,bool knownEx) {
     if(!c) { logLine("Device wrapper allocation failed; forwarding original."); return d; }
     c->original=d->lpVtbl; c->real=d; c->refs=1; c->ex=knownEx;
     c->config=readConfig(); fillDeviceTable(c);
+    logLine(!c->config.neutralSky?"Requested SKY: Normal (original blue).":c->config.blackSky?"Requested SKY: Black (ground unaffected).":"Requested SKY: Gray (ground unaffected).");
     c->lpVtbl=(const IDirect3DDevice9Vtbl*)c->entries;
     logLine(knownEx?"Public D3D9Ex device wrapper ready; runtime untouched.":"Public D3D9 device wrapper ready; runtime untouched.");
     return (IDirect3DDevice9*)c;
@@ -417,7 +426,7 @@ static ULONG STDMETHODCALLTYPE releaseFactory(IDirect3D9* d) {
 static void fillDeviceTable(DeviceContext* c) {
     IDirect3DDevice9ExVtbl t={}; t.QueryInterface=queryDevice;t.AddRef=addDevice;t.Release=releaseDevice;
     t.SetTexture=texture;t.SetSamplerState=sampler;t.Reset=reset;t.ResetEx=resetEx;
-    t.BeginStateBlock=beginBlock;t.EndStateBlock=endBlock;t.CreatePixelShader=createPixelShader;t.CreateVertexShader=createVertexShader; memcpy(c->entries,&t,sizeof(t));
+    t.BeginStateBlock=beginBlock;t.EndStateBlock=endBlock;t.CreatePixelShader=createPixelShader;t.CreateVertexShader=createVertexShader;t.SetPixelShader=setPixelShader;t.GetPixelShader=getPixelShader; memcpy(c->entries,&t,sizeof(t));
 }
 static void fillFactoryTable(FactoryContext* c) {
     IDirect3D9ExVtbl t={};t.QueryInterface=queryFactory;t.AddRef=addFactory;t.Release=releaseFactory;

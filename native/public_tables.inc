@@ -262,8 +262,8 @@ static void fillDeviceTable(DeviceContext* c) {
     c->entries[104]=(void*)forwardDevice_SetIndices;
     c->entries[105]=(void*)forwardDevice_GetIndices;
     c->entries[106]=(void*)createPixelShader;
-    c->entries[107]=(void*)forwardDevice_SetPixelShader;
-    c->entries[108]=(void*)forwardDevice_GetPixelShader;
+    c->entries[107]=(void*)setPixelShader;
+    c->entries[108]=(void*)getPixelShader;
     c->entries[109]=(void*)forwardDevice_SetPixelShaderConstantF;
     c->entries[110]=(void*)forwardDevice_GetPixelShaderConstantF;
     c->entries[111]=(void*)forwardDevice_SetPixelShaderConstantI;

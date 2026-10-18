@@ -33,7 +33,7 @@ ini=Path('CD_TextureLab.ini');assert not ini.exists()
 ini.write_text(f'[TextureLab]\nEnabled=1\nBias=0\nFlatGround=0\nNeutralSky={int(mode!="off")}\nBlackSky={int(mode=="black")}\n',encoding='ascii')
 user=c.WinDLL('user32');user.CreateWindowExW.argtypes=[w.DWORD,w.LPCWSTR,w.LPCWSTR,w.DWORD,c.c_int,c.c_int,c.c_int,c.c_int,w.HWND,c.c_void_p,c.c_void_p,c.c_void_p];user.CreateWindowExW.restype=w.HWND;user.DestroyWindow.argtypes=[w.HWND]
 window=user.CreateWindowExW(0,'STATIC','Sky color test',0x80000000,0,0,64,64,None,None,None,None)
-factory=device=target=None;shaders=[]
+factory=device=target=resource=native_device=None;shaders=[]
 try:
     dll=c.WinDLL(str(Path('d3d9.dll').resolve()));dll.Direct3DCreate9.argtypes=[w.UINT];dll.Direct3DCreate9.restype=c.c_void_p
     factory=dll.Direct3DCreate9(32);assert factory
@@ -41,9 +41,15 @@ try:
     device=c.c_void_p();hr=method(factory,16,c.c_long,w.UINT,w.UINT,w.HWND,w.DWORD,c.POINTER(Present),c.POINTER(c.c_void_p))(factory,0,1,window,0x20,c.byref(params),c.byref(device))
     if hr<0:print(f'SKIP: no D3D9 device ({hr & 0xffffffff:08x}); native sky tests remain required')
     else:
-        def create(source,profile):
+        resource=c.c_void_p()
+        check(method(device,23,c.c_long,w.UINT,w.UINT,w.UINT,w.DWORD,w.UINT,w.UINT,c.POINTER(c.c_void_p),c.c_void_p)(device,16,16,1,0,21,1,c.byref(resource),None))
+        native_device=c.c_void_p()
+        check(method(resource,3,c.c_long,c.POINTER(c.c_void_p))(resource,c.byref(native_device)))
+        assert native_device.value!=device.value,'Resource GetDevice must expose the native creation path'
+        def create(source,profile,direct=False):
             data=compile(source,profile);shader=c.c_void_p();slot=91 if profile.startswith('vs') else 106
-            check(method(device,slot,c.c_long,c.c_void_p,c.POINTER(c.c_void_p))(device,data,c.byref(shader)));shaders.append(shader);return shader
+            owner=native_device if direct else device
+            check(method(owner,slot,c.c_long,c.c_void_p,c.POINTER(c.c_void_p))(owner,data,c.byref(shader)));shaders.append(shader);return shader
         def bytecode(shader):
             size=w.UINT();fn=method(shader,4,c.c_long,c.c_void_p,c.POINTER(w.UINT));check(fn(shader,None,c.byref(size)))
             data=(w.DWORD*(size.value//4))();check(fn(shader,data,c.byref(size)));return bytes(data)
@@ -62,22 +68,32 @@ try:
             finally:check(method(target,14,c.c_long)(target))
         normalVS=create('float4 main(float4 p:POSITION):POSITION {return p;}','vs_2_0');normalPS=create('float4 main():COLOR {return float4(0,1,0,1);}','ps_2_0')
         assert draw(normalVS,normalPS)==0x00ff00,'Control triangle must render'
-        for model in (2,3):
-            for variant,source in zip(('classic','new'),SKIES):
-                sky=create(source,f'ps_{model}_0');data=bytecode(sky)
-                if mode!='off':
-                    rgb=0 if mode=='black' else 0x3f000000
-                    expected=struct.pack('<6I',0x05000051,0xa00f0000,rgb,rgb,rgb,0x3f800000)
-                    assert expected in data,f'{variant} sky did not receive {mode} replacement'
-                pixel=draw(normalVS,sky)
-                expected=0x000000 if mode=='black' else (0x808080 if mode=='gray' else 0x0000ff)
-                actual=((pixel>>16)&255,(pixel>>8)&255,pixel&255)
-                expected_rgb=((expected>>16)&255,(expected>>8)&255,expected&255)
-                assert all(abs(a-b)<=1 for a,b in zip(actual,expected_rgb)),f'{variant} ps{model} {mode}: actual {actual}, expected {expected_rgb}'
-                print('PASS: real sky pixels',variant,'ps',model,mode,actual)
+        # Ordinary ground with sky-like names must retain its green output.
+        floor=create('float4 sky_color;float4 safe_range_color;float4 main():COLOR {return float4(0,1,0,1)+(sky_color+safe_range_color)*0.00001;}','ps_2_0',True)
+        assert draw(normalVS,floor)==0x00ff00,'Sky mode changed ordinary ground/floor output'
+        print('PASS: sky mode leaves ground/floor colors unchanged',mode)
+        for direct in (False,True):
+            for model in (2,3):
+                for variant,source in zip(('classic','new'),SKIES):
+                    sky=create(source,f'ps_{model}_0',direct)
+                    pixel=draw(normalVS,sky)
+                    logical=c.c_void_p();check(method(device,108,c.c_long,c.POINTER(c.c_void_p))(device,c.byref(logical)))
+                    assert logical.value==sky.value,'GetPixelShader changed logical shader identity';release(logical)
+                    actual_shader=c.c_void_p();check(method(native_device,108,c.c_long,c.POINTER(c.c_void_p))(native_device,c.byref(actual_shader)))
+                    try:data=bytecode(actual_shader)
+                    finally:release(actual_shader)
+                    if mode!='off':
+                        rgb=0 if mode=='black' else 0x3f000000
+                        expected=struct.pack('<6I',0x05000051,0xa00f0000,rgb,rgb,rgb,0x3f800000)
+                        assert expected in data,f'{variant} sky did not receive {mode} replacement'
+                    expected=0x000000 if mode=='black' else (0x808080 if mode=='gray' else 0x0000ff)
+                    actual=((pixel>>16)&255,(pixel>>8)&255,pixel&255)
+                    expected_rgb=((expected>>16)&255,(expected>>8)&255,expected&255)
+                    assert all(abs(a-b)<=1 for a,b in zip(actual,expected_rgb)),f'{variant} ps{model} {mode}: actual {actual}, expected {expected_rgb}'
+                    print('PASS: real SKY pixels',variant,'ps',model,mode,'native-created' if direct else 'wrapper-created',actual)
 
 finally:
     for shader in shaders:release(shader)
-    release(target);release(device);release(factory)
+    release(target);release(resource);release(native_device);release(device);release(factory)
     if window:user.DestroyWindow(window)
     ini.unlink(missing_ok=True)

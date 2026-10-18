@@ -48,7 +48,9 @@ using IDirect3DCubeTexture9=IDirect3DTexture9;
  HRESULT(*BeginStateBlock)(IDirect3DDevice9*); \
  HRESULT(*EndStateBlock)(IDirect3DDevice9*,IDirect3DStateBlock9**); \
  HRESULT(*CreatePixelShader)(IDirect3DDevice9*,const DWORD*,IDirect3DPixelShader9**); \
- HRESULT(*CreateVertexShader)(IDirect3DDevice9*,const DWORD*,IDirect3DVertexShader9**)
+ HRESULT(*CreateVertexShader)(IDirect3DDevice9*,const DWORD*,IDirect3DVertexShader9**); \
+ HRESULT(*SetPixelShader)(IDirect3DDevice9*,IDirect3DPixelShader9*); \
+ HRESULT(*GetPixelShader)(IDirect3DDevice9*,IDirect3DPixelShader9**)
 struct IDirect3DDevice9Vtbl {DEVICE_PREFIX;};
 struct IDirect3DDevice9ExVtbl {DEVICE_PREFIX;HRESULT(*ResetEx)(IDirect3DDevice9Ex*,D3DPRESENT_PARAMETERS*,D3DDISPLAYMODEEX*);};
 struct IDirect3DDevice9 {const IDirect3DDevice9Vtbl*lpVtbl;};
@@ -61,9 +63,10 @@ struct IDirect3DDevice9Ex {const IDirect3DDevice9ExVtbl*lpVtbl;};
 struct IDirect3D9Vtbl {FACTORY_PREFIX;};
 struct IDirect3D9ExVtbl {FACTORY_PREFIX;HRESULT(*CreateDeviceEx)(IDirect3D9Ex*,UINT,D3DDEVTYPE,HWND,DWORD,D3DPRESENT_PARAMETERS*,D3DDISPLAYMODEEX*,IDirect3DDevice9Ex**);};
 struct IDirect3D9 {const IDirect3D9Vtbl*lpVtbl;};struct IDirect3D9Ex {const IDirect3D9ExVtbl*lpVtbl;};
-struct IDirect3DPixelShader9Vtbl {ULONG(*Release)(IDirect3DPixelShader9*);HRESULT(*GetFunction)(IDirect3DPixelShader9*,void*,UINT*);};
+struct IDirect3DPixelShader9Vtbl {ULONG(*AddRef)(IDirect3DPixelShader9*);ULONG(*Release)(IDirect3DPixelShader9*);HRESULT(*GetFunction)(IDirect3DPixelShader9*,void*,UINT*);};
 struct IDirect3DPixelShader9 {const IDirect3DPixelShader9Vtbl*lpVtbl;};
 #define IDirect3DPixelShader9_GetFunction(s,p,n) ((s)->lpVtbl->GetFunction(s,p,n))
+#define IDirect3DPixelShader9_AddRef(s) ((s)->lpVtbl->AddRef(s))
 #define IDirect3DPixelShader9_Release(s) ((s)->lpVtbl->Release(s))
 struct IDirect3DVertexShader9Vtbl {ULONG(*Release)(IDirect3DVertexShader9*);HRESULT(*GetFunction)(IDirect3DVertexShader9*,void*,UINT*);};
 struct IDirect3DVertexShader9 {const IDirect3DVertexShader9Vtbl*lpVtbl;};

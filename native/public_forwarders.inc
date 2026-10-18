@@ -389,14 +389,8 @@ static HRESULT STDMETHODCALLTYPE forwardDevice_GetIndices(IDirect3DDevice9* self
     return ((const IDirect3DDevice9Vtbl*)c->original)->GetIndices((IDirect3DDevice9*)c->real, buffer);
 }
 
-static HRESULT STDMETHODCALLTYPE forwardDevice_SetPixelShader(IDirect3DDevice9* self, IDirect3DPixelShader9 *shader) {
-    auto c=ctx((IDirect3DDevice9*)self); Hold<DeviceContext> hold(c);
-    return ((const IDirect3DDevice9Vtbl*)c->original)->SetPixelShader((IDirect3DDevice9*)c->real, shader);
-}
-static HRESULT STDMETHODCALLTYPE forwardDevice_GetPixelShader(IDirect3DDevice9* self, IDirect3DPixelShader9 **shader) {
-    auto c=ctx((IDirect3DDevice9*)self); Hold<DeviceContext> hold(c);
-    return ((const IDirect3DDevice9Vtbl*)c->original)->GetPixelShader((IDirect3DDevice9*)c->real, shader);
-}
+
+
 static HRESULT STDMETHODCALLTYPE forwardDevice_SetPixelShaderConstantF(IDirect3DDevice9* self, UINT reg_idx, const float *data, UINT count) {
     auto c=ctx((IDirect3DDevice9*)self); Hold<DeviceContext> hold(c);
     return ((const IDirect3DDevice9Vtbl*)c->original)->SetPixelShaderConstantF((IDirect3DDevice9*)c->real, reg_idx, data, count);

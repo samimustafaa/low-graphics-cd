@@ -198,6 +198,7 @@ class App:
         self.closed = False
         self.hidden = False
         self.tray = None
+        self.native_icons = []
         self.update_busy = False
         self.offered = set()
         self.available_release = None
@@ -208,7 +209,7 @@ class App:
         self.route = 'Graphics'
         self.font = 'Segoe UI' if 'Segoe UI' in tkfont.families(root) else 'Helvetica'
         self.wrapped_labels = []
-        root.title('Texture Lab 1.5.1')
+        root.title('Texture Lab 1.6.0')
         scale = float(root.tk.call('tk', 'scaling')) / (96 / 72)
         root.withdraw()
         self.work_area = monitor_work_area(root)
@@ -224,7 +225,7 @@ class App:
         root.option_add('*Font', (self.font, 9))
         root.option_add('*Entry.highlightBackground', LINE)
         root.option_add('*Entry.highlightColor', '#5b5b5b')
-        root.after(0, self.dark_titlebar)
+        self.titlebar_timer=root.after(0, self.dark_titlebar)
         try: root.iconbitmap(str(core.ROOT / 'app.ico'))
         except tk.TclError: pass
         if remember:
@@ -234,14 +235,14 @@ class App:
         self.sidebar.pack(fill='x')
         self.icon_images = [tk.PhotoImage(file=str(core.ROOT / 'icons' / f'icon-{n}.png')) for n in (16,24,32,48,64,128,256)]
         self.small_logo = self.icon_images[2]
-        root.iconphoto(True, *self.icon_images)
+        root.iconphoto(True, self.icon_images[4], self.icon_images[0])
         tk.Label(self.sidebar, image=self.small_logo, bg=PANEL).pack(side='left', padx=(22, 10), pady=12)
         self.label(self.sidebar, 'Texture Lab', 14, TEXT, True).pack(side='left', padx=(0, 26))
         self.nav = {}
         for name in ('Graphics', 'Diagnostics', 'About'):
             self.nav[name] = self.button(self.sidebar, name, lambda n=name: self.show(n), quiet=True)
             self.nav[name].pack(side='left', padx=5, pady=12)
-        self.label(self.sidebar, 'v1.5.1', 9, MUTED).pack(side='right', padx=28)
+        self.label(self.sidebar, 'v1.6.0', 9, MUTED).pack(side='right', padx=28)
         body = tk.Frame(root, bg=BG)
         body.pack(fill='both', expand=True)
         self.update_banner = self.label(body,'New update - update the app now',9,SUCCESS,True,anchor='center',cursor='hand2')
@@ -254,6 +255,25 @@ class App:
         root.protocol('WM_DELETE_WINDOW', self.hide)
         self.center_window()
         root.deiconify()
+        self.icon_timer=self.root.after(0, self.set_windows_icons)
+
+    def set_windows_icons(self):
+        if os.name!='nt' or self.closed or self.native_icons: return
+        import ctypes as c
+        from ctypes import wintypes as w
+        user=c.WinDLL('user32')
+        user.GetParent.argtypes=[w.HWND];user.GetParent.restype=w.HWND
+        user.GetSystemMetrics.argtypes=[c.c_int];user.GetSystemMetrics.restype=c.c_int
+        user.LoadImageW.argtypes=[w.HINSTANCE,w.LPCWSTR,w.UINT,c.c_int,c.c_int,w.UINT];user.LoadImageW.restype=w.HANDLE
+        user.SendMessageW.argtypes=[w.HWND,w.UINT,w.WPARAM,w.LPARAM];user.SendMessageW.restype=c.c_ssize_t
+        window=user.GetParent(self.root.winfo_id())
+        # Use native small and large ICO frames rather than an enlarged 16 px Tk image.
+        for kind,metric in ((0,49),(1,11)):
+            size=user.GetSystemMetrics(metric)
+            icon=user.LoadImageW(None,str(core.ROOT/'app.ico'),1,size,size,0x10)
+            if icon:
+                user.SendMessageW(window,0x80,kind,icon)
+                self.native_icons.append(icon)
 
     def paint_status(self):
         if getattr(self,'route',None)=='Graphics' and hasattr(self,'status_label') and self.status_label.winfo_exists():
@@ -299,9 +319,16 @@ class App:
         self.closed = True
         self.cancel_update.set()
         self.root.after_cancel(self.timer)
+        for name in ('titlebar_timer','icon_timer'):
+            if getattr(self,name,None):self.root.after_cancel(getattr(self,name))
         if self.update_timer: self.root.after_cancel(self.update_timer)
         if self.tray: self.tray.stop()
         self.root.destroy()
+        if self.native_icons:
+            import ctypes as c
+            user=c.WinDLL('user32');user.DestroyIcon.argtypes=[c.c_void_p]
+            for icon in self.native_icons:user.DestroyIcon(icon)
+            self.native_icons.clear()
 
     def periodic_update(self):
         self.check_update()
@@ -314,7 +341,7 @@ class App:
             return
         self.update_busy = True
         def worker():
-            try: self.jobs.put(('release', (update_manager.check_for_update('1.5.1'), manual)))
+            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.0'), manual)))
             except Exception as error: self.jobs.put(('update_error', (str(error), manual)))
         threading.Thread(target=worker, daemon=True).start()
 
@@ -450,12 +477,13 @@ class App:
         self.select(self.profile.get())
         lower=tk.Frame(quality,bg=CARD);lower.pack(fill='x')
         options=tk.Frame(lower,bg=CARD);options.pack(side='left',fill='x',expand=True)
-        skyrow=self.option(options,'Sky · Potato Graphics',self.neutral_sky)
+        skyrow=tk.Frame(options,bg=CARD);skyrow.pack(fill='x',pady=2)
+        self.label(skyrow,'Sky · Potato Graphics',9,MUTED,anchor='w').pack(side='left',fill='x',expand=True)
         self.sky_buttons={}
-        for name, value in [('Gray',False),('Black',True)]:
-            button=MotionButton(skyrow,name,lambda black=value:self.choose_sky(black),
+        for name, value in [('Normal (blue)','normal'),('Sky Gray','gray'),('Sky Black','black')]:
+            button=MotionButton(skyrow,name,lambda mode=value:self.choose_sky(mode),
                                 (self.font,9,'bold'),fill=BG,padx=12,pady=4)
-            button.configure(width=button.face.measure('✓ Black')+24)
+            button.configure(width=button.face.measure('✓ '+name)+20)
             button.pack(side='left',padx=3)
             self.sky_buttons[value]=button
         self.paint_sky()
@@ -482,28 +510,32 @@ class App:
 
     def paint_sky(self):
         if getattr(self,'route',None)!='Graphics': return
-        for black,button in getattr(self,'sky_buttons',{}).items():
+        active=self.profile.get()==6 and self.neutral_sky.get() and self.enabled.get()
+        chosen=('black' if self.black_sky.get() else 'gray') if active else 'normal'
+        for mode,button in getattr(self,'sky_buttons',{}).items():
             if not button.winfo_exists(): continue
-            active=self.profile.get()==6 and self.neutral_sky.get() and self.enabled.get()
-            selected=active and self.black_sky.get()==black
-            button.text=('✓ ' if selected else '')+('Black' if black else 'Gray')
+            selected=chosen==mode
+            name={'normal':'Normal (blue)','gray':'Sky Gray','black':'Sky Black'}[mode]
+            button.text=('✓ ' if selected else '')+name
             button.set_palette('#30283f' if selected else '#15171b',ACCENT if selected else MUTED,
                                hover='#3a304b' if selected else '#25282e',border=ACCENT if selected else LINE)
 
-    def choose_sky(self, black):
-        if self.profile.get()!=6:
+    def choose_sky(self, mode):
+        if mode not in ('normal','gray','black'): raise ValueError('Choose Normal, Sky Gray or Sky Black.')
+        if mode!='normal' and self.profile.get()!=6:
             self.status.set('Sky colors require Potato Graphics. Choose that preset, then Apply.')
             return
-        if not self.enabled.get():
+        if mode!='normal' and not self.enabled.get():
             self.status.set('Turn Texture changes on to use a sky color, then Apply.')
             return
-        self.black_sky.set(black)
-        self.neutral_sky.set(True)
-        self.status.set(('Black' if black else 'Gray')+' sky selected. Click Apply preset with the game closed, then relaunch.')
+        self.black_sky.set(mode=='black')
+        self.neutral_sky.set(mode!='normal')
+        name={'normal':'Normal (blue)','gray':'Sky Gray','black':'Sky Black'}[mode]
+        self.status.set(name+' selected. Click Apply preset with the game closed, then relaunch.')
 
     def choose_profile(self, mode):
         if mode == 6:
-            self.neutral_sky.set(True); self.allow_mipmaps.set(True)
+            self.allow_mipmaps.set(True)
         self.select(mode)
 
     def saved_label(self, mode, enabled=True, bypass=False):
@@ -533,7 +565,7 @@ class App:
         self.label(self.content, size=9, color=MUTED, textvariable=self.status, wraplength=740).pack(anchor='w', pady=(12, 0))
 
     def about(self):
-        self.heading('DESKTOP EDITION / 1.5.1', 'About Texture Lab',
+        self.heading('DESKTOP EDITION / 1.6.0', 'About Texture Lab',
                      'Updates check GitHub on opening and every five minutes. You choose when to install.')
         frame = self.card(self.content); frame.pack(fill='x')
         text = ('Texture Lab lowers texture detail through four presets. Close the game before applying, then launch it normally.\n\n'
@@ -599,7 +631,7 @@ class App:
         if core.sha(data) != expected: raise ValueError('The bundled DLL differs from its recorded hash. Extract a fresh package.')
         result = core.install_or_update(exe.parent, data)
         self.load_selected()
-        self.status.set(f'Helper {result} to 1.5.1. Restart the game and test Low first. Native loading and texture changes still need an in-game check.')
+        self.status.set(f'Helper {result} to 1.6.0. Restart the game and test Low first. Native loading and texture changes still need an in-game check.')
 
     def remove(self):
         exe = self.game(); core.require_closed(exe); core.uninstall(exe.parent)
@@ -614,7 +646,7 @@ class App:
         core.save_preset(exe.parent, self.profile.get(), self.enabled.get(), neutral_sky=self.neutral_sky.get(), allow_mipmaps=self.allow_mipmaps.get(), collect_stats=self.collect_stats.get(), black_sky=self.black_sky.get(), flat_ground=self.flat_ground.get())
         self.saved_label(self.profile.get(), self.enabled.get())
         self.passthrough.set(False)
-        sky=('Black' if self.black_sky.get() else 'Gray') if self.enabled.get() and self.profile.get()==6 and self.neutral_sky.get() else 'Original'
+        sky=('Black' if self.black_sky.get() else 'Gray') if self.enabled.get() and self.profile.get()==6 and self.neutral_sky.get() else 'Normal (blue)'
         self.status.set('Graphics applied. ' + self.using.get() + '. Sky: '+sky+' · restart the game.')
         if self.route=='Graphics': self.status_label.configure(fg=SUCCESS)
 

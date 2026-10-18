@@ -13,7 +13,7 @@ user.GetWindowThreadProcessId.argtypes=[w.HWND,c.POINTER(w.DWORD)]
 kernel.OpenProcess.argtypes=[w.DWORD,w.BOOL,w.DWORD];kernel.OpenProcess.restype=w.HANDLE
 kernel.WaitForSingleObject.argtypes=[w.HANDLE,w.DWORD];kernel.WaitForSingleObject.restype=w.DWORD
 kernel.CloseHandle.argtypes=[w.HANDLE]
-installer=Path('release/TextureLab-Setup-1.5.1.exe').resolve()
+installer=Path('release/TextureLab-Setup-1.6.0.exe').resolve()
 # subprocess waits for the installer itself, rather than its relaunched app tree.
 subprocess.run([str(installer),'/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/TEXTURELABUPDATE=1','/DIR='+str(Path(sys.argv[1]).resolve())],check=True,timeout=60)
 def wait_for(predicate):
@@ -23,7 +23,14 @@ def wait_for(predicate):
         if value:return value
         time.sleep(.1)
     raise AssertionError('Packaged lifecycle step timed out')
-window=wait_for(lambda:user.FindWindowW(None,'Texture Lab 1.5.1'))
+window=wait_for(lambda:user.FindWindowW(None,'Texture Lab 1.6.0'))
+from window_icons import icon_dimensions
+user.GetSystemMetrics.argtypes=[c.c_int];user.GetSystemMetrics.restype=c.c_int
+wait_for(lambda:icon_dimensions(window,1)==(user.GetSystemMetrics(11),)*2)
+large=icon_dimensions(window,1);small=icon_dimensions(window,0)
+assert large==(user.GetSystemMetrics(11),)*2 and large[0]>=32,f'Wrong taskbar icon size: {large}'
+assert small==(user.GetSystemMetrics(49),)*2,f'Wrong small icon size: {small}'
+print('PASS: actual packaged window has native HD taskbar and title icons',large,small)
 tray=wait_for(lambda:user.FindWindowW(tray_icon.CLASS_NAME,tray_icon.WINDOW_TITLE))
 pid=w.DWORD();user.GetWindowThreadProcessId(window,c.byref(pid))
 process=kernel.OpenProcess(0x100000,False,pid.value);assert process
