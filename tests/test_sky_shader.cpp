@@ -39,10 +39,14 @@ int main(){
     IDirect3DDevice9 real={&deviceTable};DeviceContext c={};c.real=&real;c.original=&deviceTable;
     c.config={true,15,32,false,true,true};
     auto wrapper=(IDirect3DDevice9*)&c;
-    for(DWORD version:{0xffff0200u,0xffff0300u}){
+    for(DWORD version:{0xffff0200u,0xffff0300u}) for(bool black:{false,true}){
+        c.config.blackSky=black;
         original.code=fixture(true,version);IDirect3DPixelShader9* result=nullptr;
         assert(SUCCEEDED(createPixelShader(wrapper,original.code.data(),&result)));
         assert(result==(IDirect3DPixelShader9*)&replacement && original.refs==0);
+        size_t start=replacement.code.size()-10;
+        for(size_t channel=2;channel<5;++channel) assert(replacement.code[start+channel]==(black?0u:0x3f000000u));
+        assert(replacement.code[start+5]==0x3f800000u);
         assert(IDirect3DPixelShader9_Release(result)==0);
     }
     original.code=fixture(false);IDirect3DPixelShader9* result=nullptr;

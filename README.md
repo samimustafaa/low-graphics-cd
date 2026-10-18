@@ -4,7 +4,7 @@ A minimal Windows graphics control app for the 32-bit Direct3D 9 version of Crea
 
 ## Install
 
-Download **TextureLab-Setup-1.3.1.exe** from [Releases](https://github.com/samimustafaa/low-graphics-cd/releases). Install and open it. Python is included; no terminal commands are needed. The standalone `TextureLab-1.3.1.exe` is an alternative if you prefer no installation.
+Download **TextureLab-Setup-1.4.0.exe** from [Releases](https://github.com/samimustafaa/low-graphics-cd/releases). Install and open it. Python is included; no terminal commands are needed. The standalone `TextureLab-1.4.0.exe` is an alternative if you prefer no installation.
 
 1. Close the game completely.
 2. Browse to your actual `client.exe`.
@@ -33,7 +33,7 @@ The chosen TL icon is used in the app, window/taskbar resources and installer. A
 
 ## Neutral sky
 
-Potato Graphics enables the **Neutral gray sky** checkbox by default. It looks for a pixel-shader CTAB comment containing the exact `skycolormid`, `skycolorlow` and `u_bg_color` names found together in the supplied skyauto shader definitions. Recognized sky pixel shaders use a constant gray output with no texture fetches. Original shader model and reflection metadata are preserved. Unknown/stripped shaders are untouched, and failed replacements retain the original shader. The log reports successful replacements as `Neutral gray sky shader created` and periodic `gray_skies` counts.
+Potato Graphics enables the **Sky · Potato Graphics** switch by default. It looks for a pixel-shader CTAB comment containing the exact `skycolormid`, `skycolorlow` and `u_bg_color` names found together in the supplied skyauto shader definitions. Recognized sky pixel shaders use a constant gray or black output (choose **Gray** or **Black**) with no texture fetches. Original shader model and reflection metadata are preserved. Unknown/stripped shaders are untouched, and failed replacements retain the original shader. The log reports successful replacements as `Neutral gray sky shader created` and periodic `gray_skies` counts.
 
 This is targeted metadata recognition, not proof of the live game's shader identity. A shader with matching metadata elsewhere could also be affected. Separate cloud/effect passes and post-processing may remain visible or tint the gray. If the sky stays blue, export Diagnostics rather than deleting game files. Disable the sky checkbox, Apply with the game closed and relaunch if it causes an issue.
 
@@ -82,3 +82,7 @@ Detached update processes now receive a fresh PyInstaller environment instead of
 The portable helper independently resets its relaunch environment. The installer also requests a fresh runtime before reopening the app, including when launched by an older installed updater. This fixes the restart path associated with `Failed to load Python DLL ... _MEI.../python312.dll` after the parent app removes its temporary folder. If an older portable updater hits this error during its first transition, close the error and open the updated EXE directly from Explorer; that independent launch does not inherit the old process environment.
 
 New regression fixtures build actual one-file parent and child executables, exercise portable and installed updates, and assert different runtime folders plus removal of the original folder. They also test the new native helper with a deliberately inherited environment and the new installer launched the way older app versions launched it. The game renderer remains 1.3.0; no game-helper reinstall is needed for this updater-only fix.
+
+## 1.4.0 optional black sky
+
+Close the game, update the app, click **Install / update** for the new renderer, choose **Potato Graphics**, enable **Sky**, select **Black**, and click **Apply preset**. Launch the game again. **Gray** remains the default; turn Sky off for the original sky. Texture strengths and updater fixes are unchanged. Only recognized sky shaders change; clouds or post-processing may still affect the final sky. Black is a visual option, not an additional guaranteed FPS increase over gray.

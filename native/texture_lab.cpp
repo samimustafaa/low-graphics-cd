@@ -1,4 +1,4 @@
-// Texture Lab 1.3.0. Public COM forwarding wrappers. System objects, private
+// Texture Lab 1.4.0. Public COM forwarding wrappers. System objects, private
 // runtime layouts and runtime vtables are never modified. Original MIT source.
 #define CINTERFACE
 #define COBJMACROS
@@ -47,14 +47,14 @@ static BOOL CALLBACK initialize(PINIT_ONCE, PVOID, PVOID*) {
     HMODULE pinned;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,
                       (LPCWSTR)selfModule,&pinned);
-    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.3.0 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
+    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.4.0 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
     logLine(line); return TRUE;
 }
 static FARPROC resolve(const char* name) {
     InitOnceExecuteOnce(&initOnce,initialize,nullptr,nullptr);
     return systemD3D?GetProcAddress(systemD3D,name):nullptr;
 }
-struct Config { bool enabled; int bias; UINT minSize; bool bypass; bool neutralSky, includeAutogen, allowMipmaps; UINT minimumMip; bool collectStats; };
+struct Config { bool enabled; int bias; UINT minSize; bool bypass; bool neutralSky, includeAutogen, allowMipmaps; UINT minimumMip; bool collectStats; bool blackSky; };
 static Config readConfig() {
     int bias=(int)GetPrivateProfileIntW(L"TextureLab",L"Bias",2,iniPath);
     int size=(int)GetPrivateProfileIntW(L"TextureLab",L"MinTextureSize",256,iniPath);
@@ -66,7 +66,8 @@ static Config readConfig() {
             GetPrivateProfileIntW(L"TextureLab",L"IncludeAutogen",0,iniPath)!=0,
             GetPrivateProfileIntW(L"TextureLab",L"ForceMipFilter",0,iniPath)!=0,
             (UINT)(minimumMip<0?0:(minimumMip>4?4:minimumMip)),
-            GetPrivateProfileIntW(L"TextureLab",L"CollectStats",0,iniPath)!=0};
+            GetPrivateProfileIntW(L"TextureLab",L"CollectStats",0,iniPath)!=0,
+            GetPrivateProfileIntW(L"TextureLab",L"BlackSky",0,iniPath)!=0};
 }
 struct CallGuard {
     bool outer;
@@ -147,12 +148,12 @@ static HRESULT STDMETHODCALLTYPE createPixelShader(IDirect3DDevice9* d,const DWO
         size_t words=graySkyWordCount(match);
         auto gray=(DWORD*)HeapAlloc(GetProcessHeap(),0,words*4);
         if(gray) {
-            makeGraySky(match,(uint32_t*)gray);IDirect3DPixelShader9* replacement=nullptr;
+            makeGraySky(match,(uint32_t*)gray,c->config.blackSky);IDirect3DPixelShader9* replacement=nullptr;
             HRESULT replacementHR=c->original->CreatePixelShader(c->real,gray,&replacement);
             if(SUCCEEDED(replacementHR) && replacement) {
                 IDirect3DPixelShader9_Release(*out);*out=replacement;++c->graySkies;
-                logLine("Neutral gray sky shader created; sky metadata matched. Restart required to restore sky.");
-            } else logLine("Gray sky shader rejected; original shader retained.");
+                logLine(c->config.blackSky?"Black sky shader created; sky metadata matched.":"Neutral gray sky shader created; sky metadata matched.");
+            } else logLine("Solid sky shader rejected; original shader retained.");
             HeapFree(GetProcessHeap(),0,gray);
         }
     }

@@ -67,6 +67,24 @@ class ManagerTests(unittest.TestCase):
         self.assertIn(b"NeutralSky=0", m.settings(6, neutral_sky=False))
         self.assertIn(b"ForceMipFilter=0", m.settings(6, allow_mipmaps=False))
 
+    def test_black_sky_roundtrip_and_scope(self):
+        self.assertIn(b"BlackSky=0", m.settings(6))
+        for mode in (0,2,4):
+            self.assertIn(b"BlackSky=0", m.settings(mode, black_sky=True))
+        self.assertIn(b"BlackSky=0", m.settings(6, neutral_sky=False, black_sky=True))
+        m.install(self.folder, self.dll)
+        m.save_preset(self.folder, 6, black_sky=True)
+        self.assertTrue(m.read_settings(self.folder)['black_sky'])
+        m.save_preset(self.folder, 6, black_sky=False)
+        self.assertFalse(m.read_settings(self.folder)['black_sky'])
+
+    def test_upgrade_preserves_applied_graphics_settings(self):
+        m.install(self.folder, self.dll)
+        m.save_preset(self.folder, 6, enabled=False, black_sky=True)
+        before=(self.folder / m.INI).read_bytes()
+        m.install_or_update(self.folder, self.dll + b'new')
+        self.assertEqual((self.folder / m.INI).read_bytes(), before)
+
     def test_default_install_uses_former_potato_as_low(self):
         m.install(self.folder, self.dll)
         parser = configparser.ConfigParser()
@@ -85,7 +103,7 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(result, "updated")
         self.assertEqual((self.folder / m.DLL).read_bytes(), b"replacement DLL")
         self.assertEqual(game.read_bytes(), b"game stays original")
-        self.assertEqual(json.loads(manifest.read_text())["build_version"], "1.3.0")
+        self.assertEqual(json.loads(manifest.read_text())["build_version"], "1.4.0")
         self.assertEqual(list(self.folder.glob("TextureLab_recovery_*")), [])
 
     def test_failed_update_rolls_back_dll_settings_and_manifest(self):

@@ -32,12 +32,13 @@ static bool findSkyMetadata(const uint32_t* code,size_t words,SkyMetadata* out) 
     return false;
 }
 static size_t graySkyWordCount(const SkyMetadata& m) {return 1+m.words+10;}
-static void makeGraySky(const SkyMetadata& m,uint32_t* out) {
+static void makeGraySky(const SkyMetadata& m,uint32_t* out,bool black=false) {
     *out++=m.version;memcpy(out,m.comment,m.words*4);out+=m.words;
-    // ps_2_0 / ps_3_0: def c0, .5, .5, .5, 1; mov oC0, c0; end.
+    // ps_2_0 / ps_3_0: def c0, RGB, RGB, RGB, 1; mov oC0, c0; end.
     // Keep the original CTAB reflection comment, including its internal offsets.
-    const uint32_t body[]={0x05000051,0xa00f0000,0x3f000000,0x3f000000,
-                          0x3f000000,0x3f800000,0x02000001,0x800f0800,
+    const uint32_t rgb=black?0u:0x3f000000u;
+    const uint32_t body[]={0x05000051,0xa00f0000,rgb,rgb,
+                          rgb,0x3f800000,0x02000001,0x800f0800,
                           0xa0e40000,0x0000ffff};
     memcpy(out,body,sizeof(body));
 }
