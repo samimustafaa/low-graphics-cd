@@ -392,7 +392,7 @@ class App:
         return frame
 
     def option(self, parent, text, variable):
-        row = tk.Frame(parent,bg=parent.cget('bg')); row.pack(fill='x',pady=5)
+        row = tk.Frame(parent,bg=parent.cget('bg')); row.pack(fill='x',pady=2)
         Switch(row,variable).pack(side='right',padx=(10,0))
         label = self.label(row,text,9,MUTED,wraplength=360,anchor='w')
         label.pack(side='left',fill='x',expand=True)
@@ -412,16 +412,16 @@ class App:
 
     def heading(self, eyebrow, title, subtitle):
         self.label(self.content,title,16 if self.compact else 18,TEXT,True).pack(anchor='w')
-        self.label(self.content,subtitle,9,MUTED,wraplength=850).pack(anchor='w',pady=(3,8))
+        self.label(self.content,subtitle,9,MUTED,wraplength=850).pack(anchor='w',pady=(3,4))
 
     def graphics(self):
         self.heading('', 'Graphics for your next game.', 'Less texture detail. A simpler sky. Apply settings with the game closed.')
-        self.label(self.content,'ⓘ  Close the game before changing textures.',9,DANGER,True).pack(anchor='w',pady=(0,10))
-        game=self.card(self.content);game.pack(fill='x',pady=(0,10))
+        self.label(self.content,'ⓘ  Close the game before changing textures.',9,DANGER,True).pack(anchor='w',pady=(0,6))
+        game=self.card(self.content);game.pack(fill='x',pady=(0,6))
         top=tk.Frame(game,bg=CARD);top.pack(fill='x')
         self.label(top,'Game client',11,TEXT,True).pack(side='left')
         self.label(top,textvariable=self.install_status,size=8,color=MUTED).pack(side='right')
-        row=tk.Frame(game,bg=CARD);row.pack(fill='x',pady=(8,8))
+        row=tk.Frame(game,bg=CARD);row.pack(fill='x',pady=(5,5))
         entry=tk.Entry(row,textvariable=self.path,bg=BG,fg=TEXT,insertbackground=TEXT,relief='flat',font=(self.font,9),bd=7,width=18,highlightthickness=1)
         self.button(row,'Browse',self.choose).pack(side='right',padx=(10,0))
         entry.pack(side='left',fill='x',expand=True);entry.bind('<Return>',lambda e:self.load_selected())
@@ -429,13 +429,13 @@ class App:
         install=self.button(actions,'Install / update',lambda:self.run(self.install))
         install.set_palette('#d5d6dc',BG,hover='#ebebef',border='#d5d6dc');install.pack(side='left')
         self.button(actions,'Restore original',lambda:self.run(self.remove),danger=True).pack(side='left',padx=10)
-        quality=self.card(self.content);quality.pack(fill='x',pady=(0,10))
+        quality=self.card(self.content);quality.pack(fill='x',pady=(0,6))
         header=tk.Frame(quality,bg=CARD);header.pack(fill='x')
         left=tk.Frame(header,bg=CARD);left.pack(side='left')
         self.label(left,'Texture changes',11,TEXT,True).pack(anchor='w')
         self.label(left,'Turn off for normal texture detail.',8,MUTED).pack(anchor='w')
         Switch(header,self.enabled).pack(side='right')
-        presets=tk.Frame(quality,bg=CARD);presets.pack(fill='x',pady=(10,8))
+        presets=tk.Frame(quality,bg=CARD);presets.pack(fill='x',pady=(8,6))
         self.profile_buttons={}
         subtitles=['Default textures','Reduced detail','Strong reduction','Least texture detail']
         for i,(value,name,description) in enumerate(PROFILES):
