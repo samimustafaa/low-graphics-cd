@@ -32,7 +32,7 @@ class ManagerTests(unittest.TestCase):
 
     def test_only_potato_allows_optional_mip_filter(self):
         m.install(self.folder, self.dll)
-        for mode, expected in [(6, ("32", "0", "0", "1")),
+        for mode, expected in [(6, ("32", "2", "0", "1")),
                                (4, ("128", "0", "0", "0")),
                                (0, ("256", "0", "0", "0"))]:
             m.apply_bias(self.folder, mode)
@@ -85,7 +85,7 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(result, "updated")
         self.assertEqual((self.folder / m.DLL).read_bytes(), b"replacement DLL")
         self.assertEqual(game.read_bytes(), b"game stays original")
-        self.assertEqual(json.loads(manifest.read_text())["build_version"], "1.1.0")
+        self.assertEqual(json.loads(manifest.read_text())["build_version"], "1.2.0")
         self.assertEqual(list(self.folder.glob("TextureLab_recovery_*")), [])
 
     def test_failed_update_rolls_back_dll_settings_and_manifest(self):

@@ -5,7 +5,7 @@
 #ifdef TEXTURELAB_HOST_TEST
 #include <thread>
 #endif
-struct FakeDevice { const IDirect3DDevice9Vtbl* lpVtbl; DWORD value; int writes; bool failReset; ULONG refs; bool nested; DWORD filter; };
+struct FakeDevice { const IDirect3DDevice9Vtbl* lpVtbl; DWORD value; int writes; bool failReset; ULONG refs; bool nested; DWORD filter; DWORD mip; };
 static IDirect3DDevice9Vtbl realTable;
 static IDirect3DDevice9* reentryTarget;
 static HRESULT STDMETHODCALLTYPE noQI(IDirect3DDevice9*,REFIID,void** out) { *out=nullptr;return E_NOINTERFACE; }
@@ -13,6 +13,7 @@ static bool rejectPoint=false;
 static HRESULT STDMETHODCALLTYPE setSampler(IDirect3DDevice9* d,DWORD,D3DSAMPLERSTATETYPE type,DWORD value) {
     auto f=(FakeDevice*)d;
     if(type==D3DSAMP_MIPFILTER){if(rejectPoint && value==D3DTEXF_POINT)return D3DERR_INVALIDCALL;f->filter=value;}
+    else if(type==D3DSAMP_MAXMIPLEVEL)f->mip=value;
     else f->value=value;
     ++f->writes;return S_OK;
 }
@@ -131,6 +132,13 @@ int main() {
     assert(first.filter==D3DTEXF_POINT);
     IDirect3DDevice9_SetTexture(d,0,nullptr);
     assert(first.value==0 && first.filter==D3DTEXF_NONE);
+    // Keep close-up detail coarse, clamp to the available chain, restore game state.
+    ctx(d)->config.minimumMip=2;
+    IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);assert(first.mip==2);
+    IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MAXMIPLEVEL,0);assert(first.mip==2);
+    IDirect3DDevice9_SetTexture(d,0,nullptr);assert(first.mip==0);
+    textureLevels=2;IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);assert(first.mip==1);
+    IDirect3DDevice9_SetTexture(d,0,nullptr);assert(first.mip==0);textureLevels=8;
     // Keep a game's existing mip filter and never force it on a one-level texture.
     IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPFILTER,D3DTEXF_LINEAR);
     IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);assert(first.filter==D3DTEXF_LINEAR);

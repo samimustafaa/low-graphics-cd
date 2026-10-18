@@ -19,7 +19,7 @@ def check(hr):
 
 ini=Path('CD_TextureLab.ini')
 assert not ini.exists(), 'Test needs a clean source/build directory'
-ini.write_text('[TextureLab]\nEnabled=1\nBias=15\nMinTextureSize=32\nForceMipFilter=1\nIncludeAutogen=1\nNeutralSky=0\n',encoding='ascii')
+ini.write_text('[TextureLab]\nEnabled=1\nBias=15\nMinTextureSize=32\nForceMipFilter=1\nMinMipLevel=2\nIncludeAutogen=1\nNeutralSky=0\n',encoding='ascii')
 user=c.WinDLL('user32')
 user.CreateWindowExW.argtypes=[w.DWORD,w.LPCWSTR,w.LPCWSTR,w.DWORD,c.c_int,c.c_int,c.c_int,c.c_int,w.HWND,c.c_void_p,c.c_void_p,c.c_void_p]
 user.CreateWindowExW.restype=w.HWND
@@ -48,10 +48,12 @@ try:
         bias=w.DWORD();filt=w.DWORD();check(getstate(device,0,8,c.byref(bias)));check(getstate(device,0,7,c.byref(filt)))
         assert struct.unpack('<f',struct.pack('<I',bias.value))[0]==15.0
         assert filt.value==1
+        floor=w.DWORD();check(setstate(device,0,9,0));check(getstate(device,0,9,c.byref(floor)));assert floor.value==2
         check(bind(device,0,None))
         check(getstate(device,0,8,c.byref(bias)));check(getstate(device,0,7,c.byref(filt)))
-        assert bias.value==0 and filt.value==0
-        print('PASS: real D3D9 texture bind, late sampler writes, effective bias/filter, and restoration on unbind')
+        check(getstate(device,0,9,c.byref(floor)))
+        assert bias.value==0 and filt.value==0 and floor.value==0
+        print('PASS: real D3D9 texture bind, late sampler writes, effective bias/filter/close-up mip floor, and restoration on unbind')
 finally:
     release(texture);release(device);release(factory)
     if window:user.DestroyWindow(window)

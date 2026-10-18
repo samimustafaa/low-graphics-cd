@@ -1,4 +1,4 @@
-#define AppVersion "1.1.0"
+#define AppVersion "1.2.0"
 [Setup]
 AppId={{5AF53953-9946-4A0A-BD65-2ED4641369B1}
 AppName=Texture Lab
@@ -20,6 +20,7 @@ InfoBeforeFile=install_notes.txt
 CloseApplications=yes
 [Files]
 Source: "..\dist\TextureLab.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "TextureLab-installed.txt"; DestDir: "{app}"; Flags: ignoreversion
 [Icons]
 Name: "{group}\Texture Lab"; Filename: "{app}\TextureLab.exe"
 Name: "{autodesktop}\Texture Lab"; Filename: "{app}\TextureLab.exe"; Tasks: desktopicon
@@ -27,3 +28,10 @@ Name: "{autodesktop}\Texture Lab"; Filename: "{app}\TextureLab.exe"; Tasks: desk
 Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 [Run]
 Filename: "{app}\TextureLab.exe"; Description: "Open Texture Lab"; Flags: nowait postinstall skipifsilent
+
+Filename: "{app}\TextureLab.exe"; Flags: nowait runhidden; Check: IsUpdateInstall
+[Code]
+function IsUpdateInstall: Boolean;
+begin
+  Result := ExpandConstant('{param:TEXTURELABUPDATE|0}') = '1';
+end;

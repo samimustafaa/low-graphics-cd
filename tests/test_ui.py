@@ -26,7 +26,7 @@ class UITests(unittest.TestCase):
             exe.write_bytes(data)
             app.path.set(str(exe)); app.load_selected()
             with patch.object(core, 'require_closed', lambda value: None):
-                app.install(); self.assertIn('1.1.0', app.install_status.get())
+                app.install(); self.assertIn('1.2.0', app.install_status.get())
                 app.select(4); app.apply(); self.assertEqual(core.read_settings(exe.parent)['bias'], 10)
                 app.load_selected(); self.assertEqual(app.profile.get(), 4)
                 app.choose_profile(6); app.apply(); self.assertEqual(core.read_settings(exe.parent)['bias'], 15)
@@ -52,3 +52,19 @@ class UITests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, 'game running'): app.apply()
                 app.remove(); self.assertFalse((exe.parent / core.DLL).exists())
             self.assertEqual(exe.read_bytes(), data)
+
+    def test_tray_hide_reveal_and_update_popup(self):
+        try: root = tk.Tk()
+        except tk.TclError: self.skipTest('No display available')
+        app = App(root, remember=False); self.addCleanup(app.close)
+        from unittest.mock import Mock
+        app.tray=Mock(available=True)
+        app.hide(); self.assertTrue(app.hidden); self.assertEqual(root.state(),'withdrawn')
+        app.reveal(); self.assertFalse(app.hidden); root.update()
+        with patch('texture_ui.messagebox.askyesno',return_value=False) as popup:
+            from update_manager import Release
+            r=Release('1.3.0','file','','1','','')
+            app.offer_update(r,False); popup.assert_called_once()
+            app.offer_update(r,False); popup.assert_called_once()
+            app.offer_update(r,True); self.assertEqual(popup.call_count,2)
+        app.close(); app.tray.stop.assert_called_once()

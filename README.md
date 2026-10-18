@@ -4,13 +4,13 @@ A minimal Windows graphics control app for the 32-bit Direct3D 9 version of Crea
 
 ## Install
 
-Download **TextureLab-Setup-1.1.0.exe** from [Releases](https://github.com/samimustafaa/low-graphics-cd/releases). Install and open it. Python is included; no terminal commands are needed. The standalone `TextureLab-1.1.0.exe` is an alternative if you prefer no installation.
+Download **TextureLab-Setup-1.2.0.exe** from [Releases](https://github.com/samimustafaa/low-graphics-cd/releases). Install and open it. Python is included; no terminal commands are needed. The standalone `TextureLab-1.2.0.exe` is an alternative if you prefer no installation.
 
 1. Close the game completely.
 2. Browse to your actual `client.exe`.
 3. Click **Install / update** once to install the bundled graphics helper.
 4. Choose a preset and click **Apply preset**.
-5. Launch the game normally. The app can be closed after applying.
+5. Launch the game normally. The app can stay in the tray after applying; right-click its icon and choose Exit to quit.
 
 **To change the textures you need to leave the game!** The app checks for the selected game process before saving. The persistent “You are using … textures” label identifies the saved preset for the next launch; it is not live telemetry from a running game.
 
@@ -21,13 +21,13 @@ Download **TextureLab-Setup-1.1.0.exe** from [Releases](https://github.com/samim
 | Ultra | +10 bias on eligible textures ≥128 pixels; unchanged from 0.6 | Original |
 | Potato Graphics | +15 bias on eligible textures ≥32 pixels, including ordinary autogen mipmaps | Optional neutral gray on recognized sky shaders |
 
-Potato Graphics replaces Wide. Version 1.1 preserves its bias even when the game writes sampler state after binding a texture, and can enable POINT mipmap sampling on eligible textures when the game requests NONE. This corrects two renderer paths which could leave nearby or distant surfaces detailed despite the selected preset. The optional filter has its own checkbox; Ultra/Low retain their previous late-write behavior. This does not prove which render path your client uses. Its broader coverage can soften buildings, trees, characters, skins, weapons, tools and interface atlases. The helper cannot reliably separate those asset categories or promise an exact “50% detail” only for characters/weapons. It requests existing lower mipmaps; it does not delete geometry or rewrite original texture files. Single-level textures without generated mipmaps, render targets and depth textures stay unchanged. No new lower-resolution textures are generated. Drivers can clamp requested bias, and textures already using their smallest mipmap cannot get simpler through bias alone.
+Potato Graphics replaces Wide. Version 1.2 additionally limits the largest sampled mipmap to level 2 for compatible ordinary mip chains, clamped to the available chain. This requests quarter-width/quarter-height texture levels even up close, rather than relying on distance bias alone. It preserves its bias even when the game writes sampler state after binding a texture, and can enable POINT mipmap sampling on eligible textures when the game requests NONE. This corrects two renderer paths which could leave nearby or distant surfaces detailed despite the selected preset. The optional filter has its own checkbox; Ultra/Low retain their previous late-write behavior. This does not prove which render path your client uses. Its broader coverage can soften buildings, trees, characters, skins, weapons, tools and interface atlases. The helper cannot reliably separate those asset categories or promise an exact “70% reduction” only for lobby skins, characters or weapons. It requests existing lower mipmaps; it does not delete geometry or rewrite original texture files. Single-level textures without generated mipmaps, render targets and depth textures stay unchanged. No new lower-resolution textures are generated. Drivers can clamp requested bias, and textures already using their smallest mipmap cannot get simpler through bias alone.
 
 ## Texture coverage and diagnostics
 
-The new mipmap option is **only for Potato Graphics**. It leaves the game's existing LINEAR/POINT filters alone, excludes render-target/depth and non-mipmapped textures, restores tracked original values when an eligible texture is unbound, and falls back if the optional filter request fails. It does not change minification/magnification filters or force a minimum mip level. Normal/off avoids texture-metadata queries.
+The new mipmap option is **only for Potato Graphics**. It leaves the game's existing LINEAR/POINT filters alone, excludes render-target/depth and non-mipmapped textures, restores tracked original values when an eligible texture is unbound, and falls back if the optional filter request fails. It does not change minification/magnification filters and requests a level-2 mip floor only when the option is on and a compatible chain reports multiple levels. It does not force a floor on autogen textures reporting only one accessible level. Normal/off avoids texture-metadata queries.
 
-The log includes `late_bias` (late game bias writes corrected), `disabled_mip` (game requests for no mipmap filtering), `mip_changes` (optional mip-filter changes), and `no_mips` (binds without an eligible mip chain). These help distinguish an unapplied override from textures that have no lower-detail levels. They do not identify asset names or prove FPS improvements.
+Periodic renderer statistics are **off by default** to reduce disk writes. Enable them in Diagnostics, save with the game closed and restart the game when investigating coverage. With statistics enabled, the log includes `mip_floor` (close-range level changes), `late_bias` (late game bias writes corrected), `disabled_mip` (game requests for no mipmap filtering), `mip_changes` (optional mip-filter changes), and `no_mips` (binds without an eligible mip chain). These help distinguish an unapplied override from textures that have no lower-detail levels. They do not identify asset names or prove FPS improvements.
 
 The chosen TL icon is used in the app, window/taskbar resources and installer. After Apply, the exact saved preset is shown both at the top and in the status area; selecting a different card alone does not change that saved label.
 
@@ -43,13 +43,13 @@ The changes aim to reduce texture sampling detail/bandwidth and simplify recogni
 
 Use **Restore original** with the game closed to remove this app's helper. Do this before uninstalling the control app; the Windows uninstaller removes the control app, not helper files in an arbitrary game directory. Ownership/hash checks prevent overwriting or removing another graphics wrapper. Earlier XML/archive modifications are not repaired by this app. Do not install the DLL into a Windows system folder.
 
-Windows 10/11 and a 32-bit x86 Direct3D 9 client are required. Existing ReShade/HiAlgo/DXVK files are not overwritten. Use only where your game/server permits graphics wrappers. No protection bypass, updater, ads, telemetry or automatic uploads are included. New binaries are unsigned; SHA-256 sums verify file integrity, not an antivirus certification. No game assets or third-party HiAlgo binaries are distributed.
+Windows 10/11 and a 32-bit x86 Direct3D 9 client are required. Existing ReShade/HiAlgo/DXVK files are not overwritten. Use only where your game/server permits graphics wrappers. No protection bypass, ads, telemetry or automatic uploads are included. Update checks contact GitHub as described below. New binaries are unsigned; SHA-256 sums verify file integrity, not an antivirus certification. No game assets or third-party HiAlgo binaries are distributed.
 
 ## Build and validation
 
 Source is MIT licensed; see `LICENSE.txt`. The tag-triggered [release workflow](.github/workflows/release.yml) builds the x86 DLL, runs Python/Tk tests and native sanitizer tests on Linux, executes SDK-native tests on Windows, attempts a real device/texture sampler-state test (explicitly skipped if no device is available), tests real Direct3D factory forwarding and shader tokens against Microsoft's assembler, then builds the standalone GUI with PyInstaller and the per-user installer with Inno Setup. Portable/installed app smoke tests and silent install/uninstall tests must pass before the release job runs.
 
-Versions 0.5 and 0.6 were reported working by the user. Those reports do not establish the compatibility or performance of this release's new aggressive coverage and gray-sky path. Automated tests do not replace real gameplay on the target GPU/client. Check the workflow result for actual build/test outcomes.
+Earlier versions were reported working by the user. Those reports do not establish the compatibility or performance of this release's new aggressive coverage and gray-sky path. Automated tests do not replace real gameplay on the target GPU/client. Check the workflow result for actual build/test outcomes.
 
 For local source tests:
 
@@ -57,4 +57,12 @@ For local source tests:
 python -m unittest discover -s tests -v
 ```
 
-Native build details are in [native/BUILD.md](native/BUILD.md). On Windows with the built DLL/hash, Python and Inno Setup 6 installed, run `tools/build_windows.ps1` to create the EXEs. Runtime dependency licensing for bundled Python/Tcl/Tk is included by PyInstaller; PyInstaller's bootloader exception permits this distribution.
+Native build details are in [native/BUILD.md](native/BUILD.md). On Windows with the built DLL/hash and TextureLab-Updater.exe, Python and Inno Setup 6 installed, run `tools/build_windows.ps1` to create the EXEs. Runtime dependency licensing for bundled Python/Tcl/Tk is included by PyInstaller; PyInstaller's bootloader exception permits this distribution.
+
+## Background mode and automatic updates
+
+Install 1.2.0 once to receive the updater; older releases cannot update themselves. The standalone app checks this repository's latest stable GitHub release on opening and every six hours while running. A popup offers a newer version; nothing downloads or installs until accepted. About and the tray menu also offer **Check for updates**. Failed automatic checks stay quiet. A failed manual check/download shows an error and leaves the app installed.
+
+Downloads use HTTPS, repository/version/filename checks, a 64 MiB bound, exact size and SHA-256 verification from the release's checksum file. This is integrity verification against the GitHub release, not independent publisher authentication. Installed copies use the per-user installer and reopen after an update. Portable copies use a separate bundled helper that waits for the app to exit, verifies the staged executable, retains `.previous`, swaps and relaunches; failed swaps/launches attempt restoration. Protected/read-only portable folders may require moving the app to a writable folder or using the installer. Updating the control app does not replace an already installed game-directory graphics helper: close the game and click **Install / update** to install the new bundled renderer, then Apply.
+
+X hides the window when Windows accepts its tray icon. Right-click it for Open, Check for updates or Exit. If no tray icon can be created, X exits so the app cannot become inaccessible. No Windows startup entry is added. A second launch activates the existing instance. The tray thread waits for native messages, hidden UI polling slows to once per second, and hover animations run only during interaction. No extra tray/update Python dependencies are required.
