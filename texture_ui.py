@@ -5,6 +5,7 @@ import os
 import queue
 import threading
 import sys
+import webbrowser
 import update_manager
 import tray_icon
 import tkinter as tk
@@ -19,12 +20,13 @@ LINE = '#34373f'
 TEXT = '#dedede'
 MUTED = '#939393'
 ACCENT = '#bfa2f5'
+YOUTUBE_URL = 'https://www.youtube.com/@sg0hann'
 SUCCESS = '#6ddd9b'
 DANGER = '#ff6464'
 PROFILES = [(0, 'Normal', 'Original texture detail and sky.'),
             (2, 'Low', 'The former Potato setting: a lighter reduction.'),
             (4, 'Ultra', 'Your existing Ultra look, unchanged.'),
-            (6, 'Potato Graphics', 'Maximum texture reduction, more object coverage, optional gray or black sky.')]
+            (6, 'Potato Graphics', 'Maximum texture reduction, more object coverage, optional gray sky.')]
 
 class MotionButton(tk.Canvas):
     """Rounded native-canvas control with event-driven fades and keyboard support."""
@@ -94,6 +96,22 @@ class MotionButton(tk.Canvas):
             self.draw()
             if step < 7: self.animation = self.after(16, lambda: tick(step+1))
         tick()
+
+
+class YouTubeButton(MotionButton):
+    """Clickable channel link with a native vector YouTube play mark."""
+    def __init__(self,parent,command,font):
+        super().__init__(parent,'YouTube · @sg0hann',command,font,fill='#24262d',fg=TEXT,border=LINE,padx=14,pady=10)
+        self.configure(width=self.winfo_reqwidth()+34)
+    def draw(self):
+        super().draw()
+        self.delete('caption')
+        h=self.winfo_height();left=12;top=h/2-9
+        self.create_polygon(left+5,top,left+23,top,left+28,top+3,left+28,top+15,
+                            left+23,top+18,left+5,top+18,left,top+15,left,top+3,
+                            smooth=True,splinesteps=24,fill='#ff0033',outline='',tags='youtube_logo')
+        self.create_polygon(left+11,top+4,left+11,top+14,left+20,top+9,fill='white',outline='',tags='youtube_logo')
+        self.create_text(48,h/2+(1 if self.pressed else 0),text=self.text,font=self.face,fill=self.foreground,anchor='w',tags='caption')
 
 
 class PresetButton(MotionButton):
@@ -180,8 +198,6 @@ class App:
         self.path = tk.StringVar()
         self.profile = tk.IntVar(value=2)
         self.neutral_sky = tk.BooleanVar(value=True)
-        self.black_sky = tk.BooleanVar(value=False)
-        self.black_sky.trace_add('write',lambda *args:self.paint_sky())
         self.neutral_sky.trace_add('write',lambda *args:self.paint_sky())
         self.flat_ground = tk.BooleanVar(value=False)
         self.allow_mipmaps = tk.BooleanVar(value=True)
@@ -209,7 +225,7 @@ class App:
         self.route = 'Graphics'
         self.font = 'Segoe UI' if 'Segoe UI' in tkfont.families(root) else 'Helvetica'
         self.wrapped_labels = []
-        root.title('Texture Lab 1.6.0')
+        root.title('Texture Lab 1.6.1')
         scale = float(root.tk.call('tk', 'scaling')) / (96 / 72)
         root.withdraw()
         self.work_area = monitor_work_area(root)
@@ -242,7 +258,7 @@ class App:
         for name in ('Graphics', 'Diagnostics', 'About'):
             self.nav[name] = self.button(self.sidebar, name, lambda n=name: self.show(n), quiet=True)
             self.nav[name].pack(side='left', padx=5, pady=12)
-        self.label(self.sidebar, 'v1.6.0', 9, MUTED).pack(side='right', padx=28)
+        self.label(self.sidebar, 'v1.6.1', 9, MUTED).pack(side='right', padx=28)
         body = tk.Frame(root, bg=BG)
         body.pack(fill='both', expand=True)
         self.update_banner = self.label(body,'New update - update the app now',9,SUCCESS,True,anchor='center',cursor='hand2')
@@ -341,7 +357,7 @@ class App:
             return
         self.update_busy = True
         def worker():
-            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.0'), manual)))
+            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.1'), manual)))
             except Exception as error: self.jobs.put(('update_error', (str(error), manual)))
         threading.Thread(target=worker, daemon=True).start()
 
@@ -480,7 +496,7 @@ class App:
         skyrow=tk.Frame(options,bg=CARD);skyrow.pack(fill='x',pady=2)
         self.label(skyrow,'Sky · Potato Graphics',9,MUTED,anchor='w').pack(side='left',fill='x',expand=True)
         self.sky_buttons={}
-        for name, value in [('Normal (blue)','normal'),('Sky Gray','gray'),('Sky Black','black')]:
+        for name, value in [('Normal (blue)','normal'),('Sky Gray','gray')]:
             button=MotionButton(skyrow,name,lambda mode=value:self.choose_sky(mode),
                                 (self.font,9,'bold'),fill=BG,padx=12,pady=4)
             button.configure(width=button.face.measure('✓ '+name)+20)
@@ -511,26 +527,25 @@ class App:
     def paint_sky(self):
         if getattr(self,'route',None)!='Graphics': return
         active=self.profile.get()==6 and self.neutral_sky.get() and self.enabled.get()
-        chosen=('black' if self.black_sky.get() else 'gray') if active else 'normal'
+        chosen='gray' if active else 'normal'
         for mode,button in getattr(self,'sky_buttons',{}).items():
             if not button.winfo_exists(): continue
             selected=chosen==mode
-            name={'normal':'Normal (blue)','gray':'Sky Gray','black':'Sky Black'}[mode]
+            name={'normal':'Normal (blue)','gray':'Sky Gray'}[mode]
             button.text=('✓ ' if selected else '')+name
             button.set_palette('#30283f' if selected else '#15171b',ACCENT if selected else MUTED,
                                hover='#3a304b' if selected else '#25282e',border=ACCENT if selected else LINE)
 
     def choose_sky(self, mode):
-        if mode not in ('normal','gray','black'): raise ValueError('Choose Normal, Sky Gray or Sky Black.')
+        if mode not in ('normal','gray'): raise ValueError('Choose Normal or Sky Gray.')
         if mode!='normal' and self.profile.get()!=6:
             self.status.set('Sky colors require Potato Graphics. Choose that preset, then Apply.')
             return
         if mode!='normal' and not self.enabled.get():
             self.status.set('Turn Texture changes on to use a sky color, then Apply.')
             return
-        self.black_sky.set(mode=='black')
         self.neutral_sky.set(mode!='normal')
-        name={'normal':'Normal (blue)','gray':'Sky Gray','black':'Sky Black'}[mode]
+        name={'normal':'Normal (blue)','gray':'Sky Gray'}[mode]
         self.status.set(name+' selected. Click Apply preset with the game closed, then relaunch.')
 
     def choose_profile(self, mode):
@@ -565,16 +580,14 @@ class App:
         self.label(self.content, size=9, color=MUTED, textvariable=self.status, wraplength=740).pack(anchor='w', pady=(12, 0))
 
     def about(self):
-        self.heading('DESKTOP EDITION / 1.6.0', 'About Texture Lab',
-                     'Updates check GitHub on opening and every five minutes. You choose when to install.')
-        frame = self.card(self.content); frame.pack(fill='x')
-        text = ('Texture Lab lowers texture detail through four presets. Close the game before applying, then launch it normally.\n\n'
-                'Potato Graphics includes an optional gray or black sky. It only changes shaders it recognizes; some clients may keep the original sky. No grass + flat ground targets recognized grass and terrain shaders.\n\n'
-                'The standalone Windows release includes everything needed to run. No Command Prompt or separate Python installation is required.\n\n'
-                'FPS and frame-time improvements depend on your PC. Use Restore original with the game closed to remove the graphics helper before uninstalling this app.')
-        self.label(frame, text, 9, TEXT, wraplength=700).pack(anchor='w')
-        self.button(frame, 'Check for updates', lambda: self.check_update(True), primary=True).pack(anchor='w', pady=(18, 0))
-        self.label(frame, 'Closing the window keeps the app in the notification area. Right-click its icon and choose Exit to quit.', 10, MUTED, wraplength=700).pack(anchor='w', pady=(14, 0))
+        self.heading('', 'About Texture Lab', 'Lower graphics for Creative Destruction.')
+        frame=self.card(self.content);frame.pack(fill='x')
+        self.label(frame,'Made for low-end PCs and laptops.',10,TEXT,wraplength=700).pack(anchor='w')
+        self.creator_label=self.label(frame,'Created by Sami Mustafa',12,TEXT,True)
+        self.creator_label.pack(anchor='w',pady=(16,10))
+        self.youtube_button=YouTubeButton(frame,lambda:webbrowser.open_new_tab(YOUTUBE_URL),(self.font,10,'bold'))
+        self.youtube_button.pack(anchor='w')
+        self.button(self.content,'Check for updates',lambda:self.check_update(True)).pack(anchor='w',pady=(16,0))
 
     def choose(self):
         if self.busy: return
@@ -607,8 +620,7 @@ class App:
                 mode = core.preset_from_settings(config)
                 self.profile.set(mode if mode in core.PRESETS else 2)
                 self.enabled.set(config['enabled']); self.passthrough.set(config['bypass'])
-                self.neutral_sky.set(config['neutral_sky'])
-                self.black_sky.set(config['black_sky'])
+                self.neutral_sky.set(config['neutral_sky'] and not config['black_sky'])
                 self.flat_ground.set(config['flat_ground'])
                 self.allow_mipmaps.set(config['allow_mipmaps'])
                 self.collect_stats.set(config['collect_stats'])
@@ -643,16 +655,16 @@ class App:
 
     def apply(self):
         exe = self.game(); core.require_closed(exe)
-        core.save_preset(exe.parent, self.profile.get(), self.enabled.get(), neutral_sky=self.neutral_sky.get(), allow_mipmaps=self.allow_mipmaps.get(), collect_stats=self.collect_stats.get(), black_sky=self.black_sky.get(), flat_ground=self.flat_ground.get())
+        core.save_preset(exe.parent, self.profile.get(), self.enabled.get(), neutral_sky=self.neutral_sky.get(), allow_mipmaps=self.allow_mipmaps.get(), collect_stats=self.collect_stats.get(), black_sky=False, flat_ground=self.flat_ground.get())
         self.saved_label(self.profile.get(), self.enabled.get())
         self.passthrough.set(False)
-        sky=('Black' if self.black_sky.get() else 'Gray') if self.enabled.get() and self.profile.get()==6 and self.neutral_sky.get() else 'Normal (blue)'
+        sky='Gray' if self.enabled.get() and self.profile.get()==6 and self.neutral_sky.get() else 'Normal (blue)'
         self.status.set('Graphics applied. ' + self.using.get() + '. Sky: '+sky+' · restart the game.')
         if self.route=='Graphics': self.status_label.configure(fg=SUCCESS)
 
     def save_passthrough(self):
         exe = self.game(); core.require_closed(exe)
-        core.save_preset(exe.parent, 0 if self.passthrough.get() else self.profile.get(), self.enabled.get(), self.passthrough.get(), neutral_sky=self.neutral_sky.get(), allow_mipmaps=self.allow_mipmaps.get(), collect_stats=self.collect_stats.get(), black_sky=self.black_sky.get(), flat_ground=self.flat_ground.get())
+        core.save_preset(exe.parent, 0 if self.passthrough.get() else self.profile.get(), self.enabled.get(), self.passthrough.get(), neutral_sky=self.neutral_sky.get(), allow_mipmaps=self.allow_mipmaps.get(), collect_stats=self.collect_stats.get(), black_sky=False, flat_ground=self.flat_ground.get())
         self.saved_label(self.profile.get(), self.enabled.get(), self.passthrough.get())
         self.status.set('Diagnostic settings saved for the next game launch. Pass-through uses normal graphics when checked.')
 
