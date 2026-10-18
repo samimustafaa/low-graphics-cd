@@ -67,6 +67,10 @@ jobs:
           if ($LASTEXITCODE) { throw "Texture sampler test failed" }
           python tools/windows_services_test.py
           if ($LASTEXITCODE) { throw "Tray/update helper test failed" }
+      - name: Test Windows UI layout and interaction
+        run: |
+          python -m unittest discover -s tests -p test_ui.py -v
+          if ($LASTEXITCODE) { throw "Windows UI tests failed" }
       - name: Build standalone app and installer
         shell: pwsh
         run: ./tools/build_windows.ps1

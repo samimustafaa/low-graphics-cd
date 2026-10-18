@@ -28,7 +28,7 @@ PROFILES = [(0, 'Normal', 'Original texture detail and sky.'),
 class MotionButton(tk.Canvas):
     """Rounded native-canvas control with event-driven fades and keyboard support."""
     def __init__(self, parent, text, command, font, fill=BG, fg=TEXT, border=LINE, padx=14, pady=8):
-        self.face = tkfont.Font(master=parent, font=font)
+        self.face = tkfont.Font(root=parent, font=font)
         scale = float(parent.tk.call('tk', 'scaling')) / (96 / 72)
         self.inset = max(1, round(scale))
         self.radius = round(9 * scale)
@@ -343,7 +343,7 @@ class App:
         self.apply_button.pack(side='right',padx=(8,0))
         notice = self.card(self.content); notice.pack(fill='x',pady=(12,0))
         self.label(notice,'STATUS',8,MUTED,True).pack(anchor='w')
-        self.label(notice,textvariable=self.status,size=9,color=TEXT,wraplength=860,height=2,anchor='nw').pack(fill='x',pady=(5,0))
+        self.label(notice,textvariable=self.status,size=9,color=TEXT,wraplength=820,height=2,anchor='nw').pack(fill='x',pady=(5,0))
         self.label(self.content,'Performance gains depend on your PC and the game scene.',8,MUTED).pack(anchor='w',pady=(10,0))
 
     def select(self, mode):
@@ -540,6 +540,11 @@ def main():
     root = tk.Tk(); app = App(root, remember=not smoke_mode)
     if not smoke_mode: app.start_services()
     if len(sys.argv) == 3 and sys.argv[1] == '--smoke-test':
+        def smoke_error(kind, value, trace):
+            import traceback
+            Path(sys.argv[2]).write_text(json.dumps({'error': ''.join(traceback.format_exception(kind,value,trace))}), encoding='utf-8')
+            app.close()
+        root.report_callback_exception = smoke_error
         # CI verifies the frozen payload and creates/tears down the actual GUI.
         def smoke():
             import tempfile
@@ -554,8 +559,8 @@ def main():
             root.geometry('%dx%d' % root.minsize())
             for page in ('Graphics','Diagnostics','About','Graphics'):
                 app.show(page);root.update_idletasks()
-                assert app.content.winfo_reqheight() <= app.content.winfo_height(), f'{page} page clips vertically'
-                assert app.content.winfo_reqwidth() <= app.content.winfo_width(), f'{page} page clips horizontally'
+                assert app.content.winfo_reqheight() <= app.content.winfo_height(), f'{page} page clips vertically: {app.content.winfo_reqheight()} > {app.content.winfo_height()}'
+                assert app.content.winfo_reqwidth() <= app.content.winfo_width(), f'{page} page clips horizontally: {app.content.winfo_reqwidth()} > {app.content.winfo_width()}'
             Path(sys.argv[2]).write_text(json.dumps({'title':root.title(), 'standalone':bool(getattr(sys,'frozen',False)), 'profiles':[p[1] for p in PROFILES], 'bundle_hash_ok':True, 'fake_install_apply_restore_ok':True}), encoding='utf-8')
             app.close()
         root.after(400, smoke)

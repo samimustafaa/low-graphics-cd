@@ -76,8 +76,8 @@ class UITests(unittest.TestCase):
         root.geometry('%dx%d' % root.minsize())
         for route in ('Graphics','Diagnostics','About','Graphics'):
             app.show(route);root.update()
-            self.assertLessEqual(app.content.winfo_reqheight(),app.content.winfo_height(),route)
-            self.assertLessEqual(app.content.winfo_reqwidth(),app.content.winfo_width(),route)
+            self.assertLessEqual(app.content.winfo_reqheight(),app.content.winfo_height(),f'{route}: {app.content.winfo_reqheight()} > {app.content.winfo_height()}')
+            self.assertLessEqual(app.content.winfo_reqwidth(),app.content.winfo_width(),f'{route}: {app.content.winfo_reqwidth()} > {app.content.winfo_width()}')
         self.assertTrue(app.apply_button.winfo_ismapped())
         self.assertLessEqual(app.apply_button.winfo_rooty()+app.apply_button.winfo_height(),root.winfo_rooty()+root.winfo_height())
         button=app.profile_buttons[6]
