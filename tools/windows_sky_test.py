@@ -72,8 +72,8 @@ try:
                 pixel=draw(normalVS,sky)
                 expected=0x000000 if mode=='black' else (0x808080 if mode=='gray' else 0x0000ff)
                 actual=((pixel>>16)&255,(pixel>>8)&255,pixel&255)
-                target=((expected>>16)&255,(expected>>8)&255,expected&255)
-                assert all(abs(a-b)<=1 for a,b in zip(actual,target)),f'{variant} ps{model} {mode}: actual {actual}, expected {target}'
+                expected_rgb=((expected>>16)&255,(expected>>8)&255,expected&255)
+                assert all(abs(a-b)<=1 for a,b in zip(actual,expected_rgb)),f'{variant} ps{model} {mode}: actual {actual}, expected {expected_rgb}'
                 print('PASS: real sky pixels',variant,'ps',model,mode,actual)
 
 finally:
