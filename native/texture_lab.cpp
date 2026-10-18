@@ -1,4 +1,4 @@
-// Texture Lab 1.2.0. Public COM forwarding wrappers. System objects, private
+// Texture Lab 1.3.0. Public COM forwarding wrappers. System objects, private
 // runtime layouts and runtime vtables are never modified. Original MIT source.
 #define CINTERFACE
 #define COBJMACROS
@@ -47,7 +47,7 @@ static BOOL CALLBACK initialize(PINIT_ONCE, PVOID, PVOID*) {
     HMODULE pinned;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,
                       (LPCWSTR)selfModule,&pinned);
-    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.2.0 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
+    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.3.0 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
     logLine(line); return TRUE;
 }
 static FARPROC resolve(const char* name) {
@@ -245,9 +245,14 @@ static HRESULT STDMETHODCALLTYPE texture(IDirect3DDevice9* d,DWORD slot,IDirect3
         applyFilter(c,slot,false);applyMip(c,slot,false);return hr;
     }
     UINT levels=t?IDirect3DBaseTexture9_GetLevelCount(t):0;
-    if(t && IDirect3DBaseTexture9_GetType(t)==D3DRTYPE_TEXTURE && (levels>1 || c->config.includeAutogen)) {
+    D3DRESOURCETYPE kind=t?IDirect3DBaseTexture9_GetType(t):(D3DRESOURCETYPE)0;
+    bool cube=kind==D3DRTYPE_CUBETEXTURE && c->config.includeAutogen;
+    if(t && (kind==D3DRTYPE_TEXTURE || cube) && (levels>1 || c->config.includeAutogen)) {
         D3DSURFACE_DESC desc;
-        if(SUCCEEDED(IDirect3DTexture9_GetLevelDesc((IDirect3DTexture9*)t,0,&desc)))
+        HRESULT description=cube?
+            IDirect3DCubeTexture9_GetLevelDesc((IDirect3DCubeTexture9*)t,0,&desc):
+            IDirect3DTexture9_GetLevelDesc((IDirect3DTexture9*)t,0,&desc);
+        if(SUCCEEDED(description))
             eligible=!(desc.Usage&(D3DUSAGE_RENDERTARGET|D3DUSAGE_DEPTHSTENCIL)) &&
                 (!(desc.Usage&D3DUSAGE_AUTOGENMIPMAP) || c->config.includeAutogen) &&
                 (levels>1 || (c->config.includeAutogen && (desc.Usage&D3DUSAGE_AUTOGENMIPMAP))) &&

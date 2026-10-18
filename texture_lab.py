@@ -1,4 +1,4 @@
-"""CD Texture Lab 1.2.0 — public COM forwarding wrappers, Windows x86 Direct3D 9.
+"""CD Texture Lab 1.3.0 — public COM forwarding wrappers, Windows x86 Direct3D 9.
 
 Python 3.9+ standard library only. No network operations. See README.md.
 """
@@ -69,7 +69,7 @@ def settings(bias=2, bypass=False, neutral_sky=True, allow_mipmaps=True, collect
         raise ValueError("Choose Normal, Low, Ultra, or Potato Graphics.")
     actual_bias, size = PRESETS[bias]
     return (f"{MARKER}\n[TextureLab]\nEnabled=1\nBias={actual_bias}\n"
-            f"MinTextureSize={size}\nCollectStats={int(collect_stats)}\nNeutralSky={int(bias == 6 and neutral_sky)}\nIncludeAutogen={int(bias == 6)}\nMinMipLevel={2 if bias == 6 and allow_mipmaps else 0}\n"
+            f"MinTextureSize={size}\nCollectStats={int(collect_stats)}\nNeutralSky={int(bias == 6 and neutral_sky)}\nIncludeAutogen={int(bias == 6)}\nMinMipLevel={4 if bias == 6 and allow_mipmaps else 0}\n"
             f"CoarsestMip=0\nForceMipFilter={int(bias == 6 and allow_mipmaps)}\nBypass={int(bypass)}\n").encode("ascii")
 
 
@@ -102,7 +102,7 @@ def install(folder, dll_bytes):
             raise ValueError(f"{p.name} already exists. Nothing was overwritten. "
                              "Remove an existing Texture Lab installation first; keep other graphics wrappers separate.")
     created = []
-    blobs = [dll_bytes, settings(), json.dumps({"app": APP, "build_version": "1.2.0", "dll_sha256": sha(dll_bytes)}, indent=2).encode()]
+    blobs = [dll_bytes, settings(), json.dumps({"app": APP, "build_version": "1.3.0", "dll_sha256": sha(dll_bytes)}, indent=2).encode()]
     try:
         for path, data in zip(targets, blobs):
             with path.open("xb") as f:
@@ -117,8 +117,8 @@ def install(folder, dll_bytes):
 def apply_bias(folder, bias, bypass=False):
     folder = Path(folder)
     record = owned_manifest(folder)
-    if bypass and record.get("build_version") != "1.2.0":
-        raise ValueError("Install/update the 1.2.0 helper before using Bypass. Restart the game afterward.")
+    if bypass and record.get("build_version") != "1.3.0":
+        raise ValueError("Install/update the 1.3.0 helper before using Bypass. Restart the game afterward.")
     ini = folder / INI
     if ini.is_symlink() or not ini.is_file() or not ini.read_text(encoding="ascii").startswith(MARKER + "\n"):
         raise ValueError("The settings file is missing or is not owned by this app.")
@@ -149,7 +149,7 @@ def uninstall(folder):
 def diagnostic_payload(exe, events=None):
     """Read only. Collect no memory dump or unrelated Windows events."""
     exe = Path(exe)
-    data = {"system.txt": f"Texture Lab 1.2.0 diagnostic export\nWindows/platform: {platform.platform()}\n"
+    data = {"system.txt": f"Texture Lab 1.3.0 diagnostic export\nWindows/platform: {platform.platform()}\n"
             f"Python: {platform.python_version()} ({struct.calcsize('P') * 8}-bit)\n"
             f"Game executable: {exe}\n"}
     for name in (LOG, INI, MANIFEST):
@@ -202,7 +202,7 @@ def install_or_update(folder, dll_bytes):
     names = (DLL, INI, MANIFEST)
     for name in names:
         shutil.copy2(folder / name, backup / name)
-    blobs = (dll_bytes, settings(), json.dumps({"app": APP, "build_version": "1.2.0", "dll_sha256": sha(dll_bytes)}, indent=2).encode())
+    blobs = (dll_bytes, settings(), json.dumps({"app": APP, "build_version": "1.3.0", "dll_sha256": sha(dll_bytes)}, indent=2).encode())
     try:
         for name, blob in zip(names, blobs):
             _atomic_write(folder / name, blob)
@@ -243,7 +243,7 @@ def save_preset(folder, mode, enabled=True, bypass=False, neutral_sky=True, allo
     data = settings(mode, bypass=bypass, neutral_sky=neutral_sky, allow_mipmaps=allow_mipmaps, collect_stats=collect_stats)
     if not enabled: data = data.replace(b"Enabled=1", b"Enabled=0")
     record = owned_manifest(Path(folder))
-    if record.get("build_version") != "1.2.0":
+    if record.get("build_version") != "1.3.0":
         raise ValueError("Click Install / update first to replace the old helper.")
     current = Path(folder) / DLL
     if current.is_symlink() or not current.is_file() or sha(current.read_bytes()) != record["dll_sha256"]:

@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import texture_lab as core
-from texture_ui import App
+from texture_ui import App, SUCCESS, monitor_work_area
 import tkinter as tk
 
 
@@ -26,7 +26,7 @@ class UITests(unittest.TestCase):
             exe.write_bytes(data)
             app.path.set(str(exe)); app.load_selected()
             with patch.object(core, 'require_closed', lambda value: None):
-                app.install(); self.assertIn('1.2.0', app.install_status.get())
+                app.install(); self.assertIn('1.3.0', app.install_status.get())
                 app.select(4); app.apply(); self.assertEqual(core.read_settings(exe.parent)['bias'], 10)
                 app.load_selected(); self.assertEqual(app.profile.get(), 4)
                 app.choose_profile(6); app.apply(); self.assertEqual(core.read_settings(exe.parent)['bias'], 15)
@@ -35,6 +35,8 @@ class UITests(unittest.TestCase):
                 self.assertTrue(core.read_settings(exe.parent)['allow_mipmaps'])
                 self.assertIn('You are using Potato Graphics textures', app.using.get())
                 app.apply(); self.assertIn('You are using Potato Graphics textures', app.status.get())
+                self.assertEqual(app.using_label.cget('fg'),SUCCESS)
+                self.assertEqual(app.status_label.cget('fg'),SUCCESS)
                 app.choose_profile(4)
                 self.assertIn('Potato Graphics', app.using.get()) # Selection alone is not Apply.
                 app.apply(); self.assertIn('You are using Ultra textures', app.using.get())
@@ -91,3 +93,16 @@ class UITests(unittest.TestCase):
         button.event_generate('<KeyPress-space>');button.event_generate('<KeyRelease-space>')
         root.update();self.assertEqual(app.profile.get(),2)
         self.assertFalse(any(isinstance(w,tk.Scrollbar) for w in app.content.master.winfo_children()))
+
+    def test_window_is_fixed_and_centered(self):
+        try: root=tk.Tk()
+        except tk.TclError: self.skipTest('No display available')
+        app=App(root,remember=False);self.addCleanup(app.close);root.update()
+        self.assertEqual(tuple(int(x) for x in root.resizable()),(0,0))
+        self.assertEqual(root.minsize(),root.maxsize())
+        left,top,right,bottom=app.work_area
+        cx=root.winfo_rootx()+root.winfo_width()/2
+        cy=root.winfo_rooty()+root.winfo_height()/2
+        # Client center differs from outer-window center by the native title bar.
+        self.assertLess(abs(cx-(left+right)/2),24)
+        self.assertLess(abs(cy-(top+bottom)/2),40)

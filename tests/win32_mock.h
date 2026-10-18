@@ -25,7 +25,7 @@ constexpr DWORD FILE_APPEND_DATA=1,FILE_SHARE_READ=1,FILE_SHARE_WRITE=2,OPEN_ALW
 constexpr DWORD HEAP_ZERO_MEMORY=1,TLS_OUT_OF_INDEXES=0xffffffff,GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS=4,GET_MODULE_HANDLE_EX_FLAG_PIN=1;
 constexpr DWORD ERROR_PROC_NOT_FOUND=127,EXCEPTION_NONCONTINUABLE=1,DLL_PROCESS_ATTACH=1;
 #define INVALID_HANDLE_VALUE ((HANDLE)(std::intptr_t)-1)
-constexpr int D3DRTYPE_TEXTURE=3,D3DSAMP_MAXMIPLEVEL=9, D3DSAMP_MIPMAPLODBIAS=8,D3DSAMP_MIPFILTER=7,D3DTEXF_NONE=0,D3DTEXF_POINT=1,D3DTEXF_LINEAR=2;
+constexpr int D3DRTYPE_TEXTURE=3,D3DRTYPE_CUBETEXTURE=5,D3DSAMP_MAXMIPLEVEL=9, D3DSAMP_MIPMAPLODBIAS=8,D3DSAMP_MIPFILTER=7,D3DTEXF_NONE=0,D3DTEXF_POINT=1,D3DTEXF_LINEAR=2;
 constexpr DWORD D3DUSAGE_RENDERTARGET=1,D3DUSAGE_DEPTHSTENCIL=2,D3DUSAGE_AUTOGENMIPMAP=1024;
 constexpr int IID_IDirect3DDevice9Ex=1,IID_IDirect3D9Ex=2,IID_IUnknown=3,IID_IDirect3DDevice9=4,IID_IDirect3D9=5;
 inline bool IsEqualIID(REFIID a,REFIID b){return a==b;}
@@ -36,6 +36,7 @@ struct D3DSURFACE_DESC {DWORD Usage,Width,Height;};
 struct IDirect3DPixelShader9;
 struct IDirect3DDevice9;struct IDirect3DDevice9Ex;struct IDirect3D9;struct IDirect3D9Ex;struct IDirect3DTexture9;
 using IDirect3DBaseTexture9=IDirect3DTexture9;
+using IDirect3DCubeTexture9=IDirect3DTexture9;
 #define DEVICE_PREFIX \
  HRESULT(*QueryInterface)(IDirect3DDevice9*,REFIID,void**); \
  ULONG(*AddRef)(IDirect3DDevice9*); \
@@ -74,6 +75,7 @@ struct IDirect3DTexture9 {const IDirect3DTexture9Vtbl*lpVtbl;};
 #define IDirect3D9Ex_Release(d) ((d)->lpVtbl->Release((IDirect3D9*)d))
 #define IDirect3DBaseTexture9_GetType(t) ((t)->lpVtbl->GetType(t))
 #define IDirect3DBaseTexture9_GetLevelCount(t) ((t)->lpVtbl->GetLevelCount(t))
+#define IDirect3DCubeTexture9_GetLevelDesc(t,l,o) ((t)->lpVtbl->GetLevelDesc(t,l,o))
 #define IDirect3DTexture9_GetLevelDesc(t,l,o) ((t)->lpVtbl->GetLevelDesc(t,l,o))
 inline thread_local void* threadValue=nullptr;
 inline LONG InterlockedIncrement(volatile LONG*p){return __atomic_add_fetch(p,1,__ATOMIC_SEQ_CST);}

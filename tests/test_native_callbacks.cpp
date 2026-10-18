@@ -28,7 +28,8 @@ static ULONG STDMETHODCALLTYPE doRelease(IDirect3DDevice9* d) { auto f=(FakeDevi
 static HRESULT STDMETHODCALLTYPE begin(IDirect3DDevice9*) { return S_OK; }
 static HRESULT STDMETHODCALLTYPE end(IDirect3DDevice9*,IDirect3DStateBlock9**) { return S_OK; }
 static UINT textureSize=512;static DWORD textureUsage=0;static DWORD textureLevels=8;
-static D3DRESOURCETYPE STDMETHODCALLTYPE getType(IDirect3DTexture9*) {return D3DRTYPE_TEXTURE;}
+static D3DRESOURCETYPE textureKind=D3DRTYPE_TEXTURE;
+static D3DRESOURCETYPE STDMETHODCALLTYPE getType(IDirect3DTexture9*) {return textureKind;}
 static DWORD STDMETHODCALLTYPE getCount(IDirect3DTexture9*) {return textureLevels;}
 static HRESULT STDMETHODCALLTYPE getDesc(IDirect3DTexture9*,UINT,D3DSURFACE_DESC* out) {memset(out,0,sizeof(*out));out->Width=out->Height=textureSize;out->Usage=textureUsage;return S_OK;}
 // Simulate a runtime with a private virtual method after its public factory ABI.
@@ -133,12 +134,21 @@ int main() {
     IDirect3DDevice9_SetTexture(d,0,nullptr);
     assert(first.value==0 && first.filter==D3DTEXF_NONE);
     // Keep close-up detail coarse, clamp to the available chain, restore game state.
-    ctx(d)->config.minimumMip=2;
-    IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);assert(first.mip==2);
-    IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MAXMIPLEVEL,0);assert(first.mip==2);
+    ctx(d)->config.minimumMip=4;
+    IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);assert(first.mip==4);
+    IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MAXMIPLEVEL,0);assert(first.mip==4);
     IDirect3DDevice9_SetTexture(d,0,nullptr);assert(first.mip==0);
     textureLevels=2;IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);assert(first.mip==1);
     IDirect3DDevice9_SetTexture(d,0,nullptr);assert(first.mip==0);textureLevels=8;
+    // Cubemap skies/reflections use their own interface, only in Potato mode.
+    textureKind=D3DRTYPE_CUBETEXTURE;
+    IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);assert(first.mip==4);
+    IDirect3DDevice9_SetTexture(d,0,nullptr);assert(first.mip==0);
+    textureUsage=D3DUSAGE_RENDERTARGET;
+    IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);assert(first.mip==0 && first.value==0);
+    textureUsage=0;ctx(d)->config.includeAutogen=false;
+    IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);assert(first.mip==0 && first.value==0);
+    ctx(d)->config.includeAutogen=true;textureKind=D3DRTYPE_TEXTURE;
     // Keep a game's existing mip filter and never force it on a one-level texture.
     IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPFILTER,D3DTEXF_LINEAR);
     IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);assert(first.filter==D3DTEXF_LINEAR);

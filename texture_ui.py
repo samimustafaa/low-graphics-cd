@@ -12,13 +12,14 @@ from tkinter import font as tkfont
 from tkinter import filedialog, messagebox
 import texture_lab as core
 
-BG = '#080808'
-PANEL = '#0c0c0c'
-CARD = '#101010'
-LINE = '#292929'
+BG = '#101113'
+PANEL = '#141518'
+CARD = '#1a1c20'
+LINE = '#34373f'
 TEXT = '#dedede'
 MUTED = '#939393'
-ACCENT = '#bcbcbc'
+ACCENT = '#bfa2f5'
+SUCCESS = '#6ddd9b'
 DANGER = '#ff6464'
 PROFILES = [(0, 'Normal', 'Original texture detail and sky.'),
             (2, 'Low', 'The former Potato setting: a lighter reduction.'),
@@ -60,7 +61,8 @@ class MotionButton(tk.Canvas):
         self.create_polygon(i+r,i,w-i-r,i,w-i,i,w-i,i+r,w-i,h-i-r,w-i,h-i,
                             w-i-r,h-i,i+r,h-i,i,h-i,i,h-i-r,i,i+r,i,i,
                             smooth=True, splinesteps=24, fill=self.current, outline=outline, width=i)
-        self.create_text(w/2,h/2+(1 if self.pressed else 0),text=self.text,font=self.face,fill=self.foreground)
+        self.create_text(w/2,h/2+(1 if self.pressed else 0),text=self.text,font=self.face,fill=self.foreground,tags='caption')
+        if getattr(self,'nav_active',False): self.create_line(10,h-2,w-10,h-2,fill=ACCENT,width=2)
     def enter(self, event):
         self.inside = True; self.fade(self.hover)
     def leave(self, event):
@@ -94,6 +96,56 @@ class MotionButton(tk.Canvas):
         tick()
 
 
+class PresetButton(MotionButton):
+    def __init__(self,parent,text,subtitle,command,font):
+        super().__init__(parent,text,command,font,padx=32,pady=10)
+        self.subface = tkfont.Font(root=parent,font=(font[0],8))
+        self.subtitle = subtitle
+        self.configure(height=self.face.metrics('linespace')+self.subface.metrics('linespace')+24,
+                       width=self.face.measure(text)+78)
+    def draw(self):
+        super().draw()
+        if not hasattr(self,'subface'): return
+        self.delete('caption')
+        w,h = self.winfo_width(),self.winfo_height()
+        color = self.foreground
+        x,y = 24,h/2
+        if self.text=='Potato Graphics':
+            self.create_line(x,y-14,x+12,y-7,x+12,y+7,x,y+14,x-12,y+7,x-12,y-7,x,y-14,fill=color,width=1.5)
+            self.create_line(x-12,y-7,x,y,x+12,y-7,fill=color,width=1.5)
+            self.create_line(x,y,x,y+14,fill=color,width=1.5)
+        elif self.text=='Low':
+            self.create_rectangle(x-11,y-13,x+11,y+13,outline=color,width=1.5)
+            for dx in (-6,0,6): self.create_line(x+dx,y-12,x+dx,y+12,fill=MUTED)
+            for dy in (-7,0,7): self.create_line(x-10,y+dy,x+10,y+dy,fill=MUTED)
+        else:
+            for dy in (-7,0,7):
+                self.create_line(x-11,y+dy,x,y+dy-6,x+11,y+dy,x,y+dy+6,x-11,y+dy,fill=color,width=1.5)
+        self.create_text(45,h/2-9,text=self.text,font=self.face,fill=color,anchor='w')
+        self.create_text(45,h/2+11,text=self.subtitle,font=self.subface,fill=MUTED,anchor='w')
+        self.create_oval(w-22,h/2-6,w-10,h/2+6,outline=color,width=1.3)
+        if self.border == ACCENT:
+            self.create_oval(w-19,h/2-3,w-13,h/2+3,fill=ACCENT,outline='')
+
+
+def monitor_work_area(root):
+    if os.name == 'nt':
+        import ctypes as c
+        from ctypes import wintypes as w
+        class MonitorInfo(c.Structure):
+            _fields_=[('size',w.DWORD),('monitor',w.RECT),('work',w.RECT),('flags',w.DWORD)]
+        try:
+            user=c.WinDLL('user32')
+            user.GetCursorPos.argtypes=[c.POINTER(w.POINT)];user.GetCursorPos.restype=w.BOOL
+            user.MonitorFromPoint.argtypes=[w.POINT,w.DWORD];user.MonitorFromPoint.restype=w.HANDLE
+            user.GetMonitorInfoW.argtypes=[w.HANDLE,c.POINTER(MonitorInfo)];user.GetMonitorInfoW.restype=w.BOOL
+            point=w.POINT();info=MonitorInfo();info.size=c.sizeof(info)
+            if user.GetCursorPos(c.byref(point)) and user.GetMonitorInfoW(user.MonitorFromPoint(point,2),c.byref(info)):
+                r=info.work;return r.left,r.top,r.right,r.bottom
+        except (OSError,AttributeError): pass
+    return 0,0,root.winfo_screenwidth(),root.winfo_screenheight()
+
+
 def preferences_path():
     return Path(os.environ.get('LOCALAPPDATA', str(Path.home() / '.config'))) / 'CDTextureLab' / 'preferences.json'
 
@@ -114,12 +166,12 @@ class Switch(tk.Canvas):
         self.focus_set(); self.variable.set(not self.variable.get()); return 'break'
     def draw(self):
         self.delete('all'); on = self.variable.get()
-        color = '#303030' if on else '#151515'
+        color = ACCENT if on else '#25272c'
         edge = '#777777' if self.focus_get() is self else ('#555555' if on else '#333333')
         points = [11,2,27,2,36,2,36,11,36,20,27,20,11,20,2,20,2,11,2,2]
         self.create_polygon(*[v*self.scale for v in points], smooth=True, splinesteps=20, fill=color, outline=edge, width=max(1,round(self.scale)))
         x = 22 if on else 6
-        self.create_oval(*[v*self.scale for v in (x,6,x+10,16)],fill='#bcbcbc' if on else '#666666',outline='')
+        self.create_oval(*[v*self.scale for v in (x,6,x+10,16)],fill='#f3edff' if on else '#777980',outline='')
 
 
 class App:
@@ -129,10 +181,12 @@ class App:
         self.profile = tk.IntVar(value=2)
         self.neutral_sky = tk.BooleanVar(value=True)
         self.allow_mipmaps = tk.BooleanVar(value=True)
+        self.applied = False
         self.using = tk.StringVar(value="No preset applied yet.")
         self.enabled = tk.BooleanVar(value=True)
         self.passthrough = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value='Choose the game client to get started.')
+        self.status.trace_add('write',lambda *args:self.paint_status())
         self.install_status = tk.StringVar(value='Not connected')
         self.activity = tk.StringVar(value='No game selected')
         self.busy = False
@@ -148,11 +202,18 @@ class App:
         self.route = 'Graphics'
         self.font = 'Segoe UI' if 'Segoe UI' in tkfont.families(root) else 'Helvetica'
         self.wrapped_labels = []
-        root.title('Texture Lab 1.2.1')
+        root.title('Texture Lab 1.3.0')
         scale = float(root.tk.call('tk', 'scaling')) / (96 / 72)
-        available_w, available_h = root.winfo_screenwidth()-60, root.winfo_screenheight()-80
-        root.geometry(f'{min(round(1000*scale), available_w)}x{min(round(640*scale), available_h)}')
-        root.minsize(min(round(940*scale), available_w), min(round(640*scale), available_h))
+        root.withdraw()
+        self.work_area = monitor_work_area(root)
+        left,top,right,bottom = self.work_area
+        width = min(round(1040*scale),right-left-32)
+        height = min(round(730*scale),bottom-top-48)
+        self.compact = height < round(700*scale)
+        self.fixed_size = width,height
+        root.geometry(f'{width}x{height}')
+        root.minsize(width,height);root.maxsize(width,height)
+        root.resizable(False,False)
         root.configure(bg=BG)
         root.option_add('*Font', (self.font, 9))
         root.option_add('*Entry.highlightBackground', LINE)
@@ -175,15 +236,38 @@ class App:
         for name in ('Graphics', 'Diagnostics', 'About'):
             self.nav[name] = self.button(self.sidebar, name, lambda n=name: self.show(n), quiet=True)
             self.nav[name].pack(side='left', padx=5, pady=12)
-        self.label(self.sidebar, 'v1.2.1', 9, MUTED).pack(side='right', padx=28)
+        self.label(self.sidebar, 'v1.3.0', 9, MUTED).pack(side='right', padx=28)
         body = tk.Frame(root, bg=BG)
         body.pack(fill='both', expand=True)
-        self.content = tk.Frame(body, bg=BG, padx=22, pady=12)
+        self.content = tk.Frame(body, bg=BG, padx=22, pady=8 if self.compact else 12)
         self.content.pack(fill='both', expand=True)
         self.show('Graphics')
         self.load_selected()
         self.timer = root.after(250, self.check_jobs)
         root.protocol('WM_DELETE_WINDOW', self.hide)
+        self.center_window()
+        root.deiconify()
+
+    def paint_status(self):
+        if getattr(self,'route',None)=='Graphics' and hasattr(self,'status_label') and self.status_label.winfo_exists():
+            self.status_label.configure(fg=SUCCESS if self.status.get().startswith('Graphics applied.') else MUTED)
+
+    def center_window(self):
+        self.root.update_idletasks()
+        width,height=self.fixed_size
+        outer_w,outer_h=width,height
+        if os.name=='nt':
+            import ctypes as c
+            from ctypes import wintypes as w
+            user=c.WinDLL('user32')
+            user.GetParent.argtypes=[w.HWND];user.GetParent.restype=w.HWND
+            user.GetWindowRect.argtypes=[w.HWND,c.POINTER(w.RECT)];user.GetWindowRect.restype=w.BOOL
+            rect=w.RECT()
+            if user.GetWindowRect(user.GetParent(self.root.winfo_id()),c.byref(rect)):
+                outer_w,outer_h=rect.right-rect.left,rect.bottom-rect.top
+        l,t,r,b=self.work_area
+        x=l+max(0,(r-l-outer_w)//2);y=t+max(0,(b-t-outer_h)//2)
+        self.root.geometry(f'{width}x{height}+{x}+{y}')
 
     def start_services(self):
         self.tray = tray_icon.TrayIcon(core.ROOT / 'app.ico', lambda action: self.jobs.put(('tray', action)))
@@ -223,7 +307,7 @@ class App:
             return
         self.update_busy = True
         def worker():
-            try: self.jobs.put(('release', (update_manager.check_for_update('1.2.1'), manual)))
+            try: self.jobs.put(('release', (update_manager.check_for_update('1.3.0'), manual)))
             except Exception as error: self.jobs.put(('update_error', (str(error), manual)))
         threading.Thread(target=worker, daemon=True).start()
 
@@ -276,12 +360,24 @@ class App:
 
     def button(self, parent, text, command, primary=False, quiet=False, danger=False):
         return MotionButton(parent,text,command,(self.font,9,'bold'),
-                            fill='#1c1c1c' if primary else parent.cget('bg'),
-                            fg=DANGER if danger else TEXT,
-                            border='#575757' if primary else (PANEL if quiet else LINE))
+                            fill=ACCENT if primary else ('#24262d' if not quiet else PANEL),
+                            fg=DANGER if danger else (BG if primary else TEXT),
+                            border=ACCENT if primary else (PANEL if quiet else LINE))
 
-    def card(self, parent):
-        return tk.Frame(parent,bg=CARD,highlightbackground=LINE,highlightthickness=1,padx=16,pady=14)
+    def card(self,parent):
+        padding=10 if self.compact else 12
+        frame=tk.Frame(parent,bg=CARD,padx=16,pady=padding)
+        canvas=tk.Canvas(frame,bg=parent.cget('bg'),highlightthickness=0,bd=0)
+        canvas.place(x=-16,y=-padding,relwidth=1,relheight=1,width=32,height=padding*2)
+        def paint(event):
+            w,h=event.width,event.height;r=10;i=1
+            canvas.delete('all')
+            canvas.create_polygon(i+r,i,w-i-r,i,w-i,i,w-i,i+r,w-i,h-i-r,w-i,h-i,
+                w-i-r,h-i,i+r,h-i,i,h-i,i,h-i-r,i,i+r,i,i,smooth=True,splinesteps=24,
+                fill=CARD,outline=LINE)
+        canvas.bind('<Configure>',paint)
+        canvas.tk.call('lower',canvas._w)
+        return frame
 
     def option(self, parent, text, variable):
         row = tk.Frame(parent,bg=parent.cget('bg')); row.pack(fill='x',pady=5)
@@ -296,62 +392,66 @@ class App:
         self.wrapped_labels.clear()
         for widget in self.content.winfo_children(): widget.destroy()
         for name, widget in self.nav.items():
-            widget.set_palette('#1b1b1b' if name == route else PANEL, TEXT if name == route else MUTED, border='#383838' if name == route else PANEL)
+            widget.nav_active=name==route
+            widget.set_palette('#25222e' if name == route else PANEL, ACCENT if name == route else MUTED, border='#34313d' if name == route else PANEL)
         if route == 'Graphics': self.graphics()
         elif route == 'Diagnostics': self.diagnostics()
         else: self.about()
 
     def heading(self, eyebrow, title, subtitle):
-        self.label(self.content,title,18,TEXT,True).pack(anchor='w')
+        self.label(self.content,title,16 if self.compact else 18,TEXT,True).pack(anchor='w')
         self.label(self.content,subtitle,9,MUTED,wraplength=850).pack(anchor='w',pady=(3,8))
 
     def graphics(self):
-        self.heading('', 'Graphics', 'Creative Destruction  /  Choose a preset for your next game launch.')
-        self.label(self.content,'To change the textures you need to leave the game!',9,DANGER,True).pack(anchor='w',pady=(0,8))
-        self.label(self.content,textvariable=self.using,size=10,bold=True).pack(anchor='w',pady=(0,10))
-        panels = tk.Frame(self.content,bg=BG); panels.pack(fill='x')
-        panels.columnconfigure(0,weight=1,uniform='panels'); panels.columnconfigure(1,weight=2,uniform='panels')
-        game = self.card(panels); game.grid(row=0,column=0,sticky='nsew',padx=(0,12))
-        self.label(game,'Game client',12,TEXT,True).pack(anchor='w')
-        self.label(game,textvariable=self.install_status,size=8,color=MUTED).pack(anchor='w',pady=(4,10))
-        entry = tk.Entry(game,textvariable=self.path,bg=BG,fg=TEXT,insertbackground=TEXT,
-                         relief='flat',font=(self.font,9),bd=8,width=18,highlightthickness=1)
-        entry.pack(fill='x'); entry.bind('<Return>',lambda e: self.load_selected())
-        self.button(game,'Browse client.exe',self.choose).pack(fill='x',pady=(8,10))
-        self.button(game,'Install / update',lambda:self.run(self.install),primary=True).pack(fill='x',pady=(0,8))
-        self.button(game,'Restore original',lambda:self.run(self.remove),danger=True).pack(fill='x')
-        self.label(game,'Close game → Apply → Launch',8,MUTED).pack(anchor='w',pady=(10,0))
-        quality = self.card(panels); quality.grid(row=0,column=1,sticky='nsew')
-        header = tk.Frame(quality,bg=CARD); header.pack(fill='x')
-        self.label(header,'Texture preset',12,TEXT,True).pack(side='left')
+        self.heading('', 'Graphics for your next game.', 'Less texture detail. A simpler sky. Apply settings with the game closed.')
+        self.label(self.content,'ⓘ  Close the game before changing textures.',9,DANGER,True).pack(anchor='w',pady=(0,10))
+        game=self.card(self.content);game.pack(fill='x',pady=(0,10))
+        top=tk.Frame(game,bg=CARD);top.pack(fill='x')
+        self.label(top,'Game client',11,TEXT,True).pack(side='left')
+        self.label(top,textvariable=self.install_status,size=8,color=MUTED).pack(side='right')
+        row=tk.Frame(game,bg=CARD);row.pack(fill='x',pady=(8,8))
+        entry=tk.Entry(row,textvariable=self.path,bg=BG,fg=TEXT,insertbackground=TEXT,relief='flat',font=(self.font,9),bd=7,width=18,highlightthickness=1)
+        self.button(row,'Browse',self.choose).pack(side='right',padx=(10,0))
+        entry.pack(side='left',fill='x',expand=True);entry.bind('<Return>',lambda e:self.load_selected())
+        actions=tk.Frame(game,bg=CARD);actions.pack(fill='x')
+        install=self.button(actions,'Install / update',lambda:self.run(self.install))
+        install.set_palette('#d5d6dc',BG,hover='#ebebef',border='#d5d6dc');install.pack(side='left')
+        self.button(actions,'Restore original',lambda:self.run(self.remove),danger=True).pack(side='left',padx=10)
+        quality=self.card(self.content);quality.pack(fill='x',pady=(0,10))
+        header=tk.Frame(quality,bg=CARD);header.pack(fill='x')
+        left=tk.Frame(header,bg=CARD);left.pack(side='left')
+        self.label(left,'Texture changes',11,TEXT,True).pack(anchor='w')
+        self.label(left,'Turn off for normal texture detail.',8,MUTED).pack(anchor='w')
         Switch(header,self.enabled).pack(side='right')
-        presets = tk.Frame(quality,bg=CARD); presets.pack(fill='x',pady=(12,8))
-        self.profile_buttons = {}
+        presets=tk.Frame(quality,bg=CARD);presets.pack(fill='x',pady=(10,8))
+        self.profile_buttons={}
+        subtitles=['Default textures','Reduced detail','Strong reduction','Least texture detail']
         for i,(value,name,description) in enumerate(PROFILES):
             presets.columnconfigure(i,weight=1,uniform='profiles')
-            button = MotionButton(presets,name,lambda n=value:self.choose_profile(n),(self.font,9,'bold'),padx=7,pady=11)
-            button.grid(row=0,column=i,sticky='ew',padx=(0 if i==0 else 5,0))
-            self.profile_buttons[value] = button
-        self.profile_description = tk.StringVar()
-        self.label(quality,textvariable=self.profile_description,size=8,color=MUTED,wraplength=520,height=2,anchor='nw').pack(fill='x',pady=(0,6))
+            button=PresetButton(presets,name,subtitles[i],lambda n=value:self.choose_profile(n),(self.font,9,'bold'))
+            button.grid(row=0,column=i,sticky='ew',padx=(0 if i==0 else 8,0));self.profile_buttons[value]=button
+        self.profile_description=tk.StringVar()
+        self.label(quality,textvariable=self.profile_description,size=8,color=MUTED,wraplength=860,height=1,anchor='w').pack(fill='x',pady=(0,6))
         self.select(self.profile.get())
-        self.option(quality,'Neutral gray sky · Potato Graphics',self.neutral_sky)
-        self.option(quality,'Coarser close-up textures + lower mipmaps',self.allow_mipmaps)
-        foot = tk.Frame(quality,bg=CARD); foot.pack(fill='x',pady=(14,0))
-        self.label(foot,'Saved settings take effect after restart.',8,MUTED).pack(side='left')
-        self.apply_button = self.button(foot,'Apply preset',lambda:self.run(self.apply),primary=True)
-        self.apply_button.pack(side='right',padx=(8,0))
-        notice = self.card(self.content); notice.pack(fill='x',pady=(12,0))
-        self.label(notice,'STATUS',8,MUTED,True).pack(anchor='w')
-        self.label(notice,textvariable=self.status,size=9,color=TEXT,wraplength=820,height=2,anchor='nw').pack(fill='x',pady=(5,0))
-        self.label(self.content,'Performance gains depend on your PC and the game scene.',8,MUTED).pack(anchor='w',pady=(10,0))
+        lower=tk.Frame(quality,bg=CARD);lower.pack(fill='x')
+        options=tk.Frame(lower,bg=CARD);options.pack(side='left',fill='x',expand=True)
+        self.option(options,'Neutral gray sky · Potato Graphics',self.neutral_sky)
+        self.option(options,'Stronger close-up textures + sky mipmaps · Potato',self.allow_mipmaps)
+        self.apply_button=self.button(lower,'Apply preset  →',lambda:self.run(self.apply),primary=True)
+        self.apply_button.pack(side='right',padx=(20,0),anchor='s',pady=5)
+        notice=self.card(self.content);notice.pack(fill='x')
+        self.using_label=self.label(notice,textvariable=self.using,size=10,color=SUCCESS if self.applied else MUTED,bold=True,anchor='w')
+        self.using_label.pack(fill='x')
+        self.status_label=self.label(notice,textvariable=self.status,size=8,color=SUCCESS if self.status.get().startswith('Graphics applied.') else MUTED,wraplength=860,height=2,anchor='nw')
+        self.status_label.pack(fill='x',pady=(5,0))
+        self.label(self.content,'FPS and frame-time gains depend on your hardware and game scene.',8,MUTED).pack(anchor='w',pady=(8,0))
 
     def select(self, mode):
         self.profile.set(mode)
         if self.route != 'Graphics': return
         for value, button in self.profile_buttons.items():
             chosen = value == mode
-            button.set_palette('#222222' if chosen else BG, TEXT if chosen else MUTED, border='#707070' if chosen else LINE)
+            button.set_palette('#292334' if chosen else '#14161a', ACCENT if chosen else TEXT, border=ACCENT if chosen else LINE)
         desc = next((d for v, n, d in PROFILES if v == mode), 'Choose a preset.')
         self.profile_description.set(desc)
 
@@ -363,6 +463,8 @@ class App:
     def saved_label(self, mode, enabled=True, bypass=False):
         name = next((name for value, name, desc in PROFILES if value == mode), 'Low')
         if not enabled or bypass: name = 'Normal'
+        self.applied=True
+        if self.route=='Graphics' and hasattr(self,'using_label') and self.using_label.winfo_exists(): self.using_label.configure(fg=SUCCESS)
         self.using.set(f'You are using {name} textures.  ·  Saved for next game launch')
 
     def diagnostics(self):
@@ -385,7 +487,7 @@ class App:
         self.label(self.content, size=9, color=MUTED, textvariable=self.status, wraplength=740).pack(anchor='w', pady=(12, 0))
 
     def about(self):
-        self.heading('DESKTOP EDITION / 1.2.1', 'About Texture Lab',
+        self.heading('DESKTOP EDITION / 1.3.0', 'About Texture Lab',
                      'Updates check GitHub on opening and every six hours. You choose when to install.')
         frame = self.card(self.content); frame.pack(fill='x')
         text = ('Texture Lab lowers texture detail through four presets. Close the game before applying, then launch it normally.\n\n'
@@ -409,7 +511,9 @@ class App:
         if self.busy: return
         try: fn()
         except (OSError, ValueError, KeyError) as error:
-            self.status.set(str(error)); messagebox.showerror('Texture Lab', str(error), parent=self.root)
+            self.status.set(str(error))
+            if self.route=='Graphics': self.status_label.configure(fg=DANGER)
+            messagebox.showerror('Texture Lab',str(error),parent=self.root)
 
     def load_selected(self):
         if not self.path.get().strip(): return
@@ -432,7 +536,9 @@ class App:
                 self.status.set('Game selected. Install / update replaces older helper versions; close the game first.')
             else:
                 self.install_status.set('READY TO INSTALL')
+                self.applied=False
                 self.using.set('No preset applied yet.')
+                if self.route=='Graphics': self.using_label.configure(fg=MUTED)
                 self.status.set('Game selected. Close the game, then click Install / update.')
             if self.route == 'Graphics': self.select(self.profile.get())
         except (OSError, ValueError, KeyError) as error:
@@ -445,11 +551,13 @@ class App:
         if core.sha(data) != expected: raise ValueError('The bundled DLL differs from its recorded hash. Extract a fresh package.')
         result = core.install_or_update(exe.parent, data)
         self.load_selected()
-        self.status.set(f'Helper {result} to 1.2.0. Restart the game and test Low first. Native loading and texture changes still need an in-game check.')
+        self.status.set(f'Helper {result} to 1.3.0. Restart the game and test Low first. Native loading and texture changes still need an in-game check.')
 
     def remove(self):
         exe = self.game(); core.require_closed(exe); core.uninstall(exe.parent)
         self.install_status.set('HELPER REMOVED')
+        self.applied=False
+        if self.route=='Graphics': self.using_label.configure(fg=MUTED)
         self.using.set('Original graphics restored.')
         self.status.set('Original DLL loading restored. The diagnostic log was kept.')
 
@@ -458,7 +566,8 @@ class App:
         core.save_preset(exe.parent, self.profile.get(), self.enabled.get(), neutral_sky=self.neutral_sky.get(), allow_mipmaps=self.allow_mipmaps.get(), collect_stats=self.collect_stats.get())
         self.saved_label(self.profile.get(), self.enabled.get())
         self.passthrough.set(False)
-        self.status.set(self.using.get() + '. Close the app if you want, then launch the game normally.')
+        self.status.set('Graphics applied. ' + self.using.get() + '.')
+        if self.route=='Graphics': self.status_label.configure(fg=SUCCESS)
 
     def save_passthrough(self):
         exe = self.game(); core.require_closed(exe)
