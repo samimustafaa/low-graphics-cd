@@ -178,7 +178,7 @@ class App:
         self.label(self.sidebar, 'v1.2.1', 9, MUTED).pack(side='right', padx=28)
         body = tk.Frame(root, bg=BG)
         body.pack(fill='both', expand=True)
-        self.content = tk.Frame(body, bg=BG, padx=22, pady=16)
+        self.content = tk.Frame(body, bg=BG, padx=22, pady=12)
         self.content.pack(fill='both', expand=True)
         self.show('Graphics')
         self.load_selected()
@@ -303,29 +303,29 @@ class App:
 
     def heading(self, eyebrow, title, subtitle):
         self.label(self.content,title,18,TEXT,True).pack(anchor='w')
-        self.label(self.content,subtitle,9,MUTED,wraplength=850).pack(anchor='w',pady=(3,12))
+        self.label(self.content,subtitle,9,MUTED,wraplength=850).pack(anchor='w',pady=(3,8))
 
     def graphics(self):
         self.heading('', 'Graphics', 'Creative Destruction  /  Choose a preset for your next game launch.')
         self.label(self.content,'To change the textures you need to leave the game!',9,DANGER,True).pack(anchor='w',pady=(0,8))
-        self.label(self.content,textvariable=self.using,size=10,bold=True).pack(anchor='w',pady=(0,14))
+        self.label(self.content,textvariable=self.using,size=10,bold=True).pack(anchor='w',pady=(0,10))
         panels = tk.Frame(self.content,bg=BG); panels.pack(fill='x')
         panels.columnconfigure(0,weight=1,uniform='panels'); panels.columnconfigure(1,weight=2,uniform='panels')
         game = self.card(panels); game.grid(row=0,column=0,sticky='nsew',padx=(0,12))
         self.label(game,'Game client',12,TEXT,True).pack(anchor='w')
-        self.label(game,textvariable=self.install_status,size=8,color=MUTED).pack(anchor='w',pady=(4,14))
+        self.label(game,textvariable=self.install_status,size=8,color=MUTED).pack(anchor='w',pady=(4,10))
         entry = tk.Entry(game,textvariable=self.path,bg=BG,fg=TEXT,insertbackground=TEXT,
                          relief='flat',font=(self.font,9),bd=8,width=18,highlightthickness=1)
         entry.pack(fill='x'); entry.bind('<Return>',lambda e: self.load_selected())
-        self.button(game,'Browse client.exe',self.choose).pack(fill='x',pady=(8,18))
+        self.button(game,'Browse client.exe',self.choose).pack(fill='x',pady=(8,10))
         self.button(game,'Install / update',lambda:self.run(self.install),primary=True).pack(fill='x',pady=(0,8))
         self.button(game,'Restore original',lambda:self.run(self.remove),danger=True).pack(fill='x')
-        self.label(game,'Close game → Apply → Launch',8,MUTED).pack(anchor='w',pady=(14,0))
+        self.label(game,'Close game → Apply → Launch',8,MUTED).pack(anchor='w',pady=(10,0))
         quality = self.card(panels); quality.grid(row=0,column=1,sticky='nsew')
         header = tk.Frame(quality,bg=CARD); header.pack(fill='x')
         self.label(header,'Texture preset',12,TEXT,True).pack(side='left')
         Switch(header,self.enabled).pack(side='right')
-        presets = tk.Frame(quality,bg=CARD); presets.pack(fill='x',pady=(16,10))
+        presets = tk.Frame(quality,bg=CARD); presets.pack(fill='x',pady=(12,8))
         self.profile_buttons = {}
         for i,(value,name,description) in enumerate(PROFILES):
             presets.columnconfigure(i,weight=1,uniform='profiles')

@@ -74,10 +74,14 @@ class UITests(unittest.TestCase):
         except tk.TclError: self.skipTest('No display available')
         app=App(root,remember=False);self.addCleanup(app.close)
         root.geometry('%dx%d' % root.minsize())
+        layouts=[]
         for route in ('Graphics','Diagnostics','About','Graphics'):
             app.show(route);root.update()
-            self.assertLessEqual(app.content.winfo_reqheight(),app.content.winfo_height(),f'{route}: {app.content.winfo_reqheight()} > {app.content.winfo_height()}')
-            self.assertLessEqual(app.content.winfo_reqwidth(),app.content.winfo_width(),f'{route}: {app.content.winfo_reqwidth()} > {app.content.winfo_width()}')
+            layouts.append((route,app.content.winfo_reqwidth(),app.content.winfo_reqheight(),app.content.winfo_width(),app.content.winfo_height()))
+        for route,rw,rh,w,h in layouts:
+            with self.subTest(route=route):
+                self.assertLessEqual(rh,h,f'{route}: {rh} > {h}')
+                self.assertLessEqual(rw,w,f'{route}: {rw} > {w}')
         self.assertTrue(app.apply_button.winfo_ismapped())
         self.assertLessEqual(app.apply_button.winfo_rooty()+app.apply_button.winfo_height(),root.winfo_rooty()+root.winfo_height())
         button=app.profile_buttons[6]
