@@ -1,0 +1,9 @@
+Close Creative Destruction before applying graphics settings.
+
+This installer installs the control app. Open it, select client.exe, click Install / update, choose a preset and click Apply. Then start the game normally.
+
+Python is included. No terminal commands or separate Python installation are needed.
+
+Use Restore original in Texture Lab before uninstalling the control app. Uninstalling the control app alone does not remove the graphics helper from your game folder.
+
+The graphics helper is for a permitted 32-bit Direct3D 9 client. Potato Graphics can blur UI and characters. Gray sky is experimental and needs identifiable sky shader metadata. FPS gains are hardware dependent and are not guaranteed. The executable is unsigned.

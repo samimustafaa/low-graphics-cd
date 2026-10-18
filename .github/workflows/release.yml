@@ -1,0 +1,87 @@
+name: Test, build and release Windows app
+on:
+  push:
+    tags: ['v*']
+    branches: ['main']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native build and GUI test tools
+        run: sudo apt-get update && sudo apt-get install -y g++-mingw-w64-i686 python3-tk xvfb
+      - name: Backend and UI tests
+        run: xvfb-run -a python3 -m unittest discover -s tests -v
+      - name: Native sanitizer tests
+        run: |
+          mkdir -p native-tests
+          for name in native_callbacks sky_shader; do
+            g++ -std=c++17 -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -DTEXTURELAB_HOST_TEST -Wno-format tests/test_${name}.cpp -o native-tests/${name}
+            ASAN_OPTIONS=detect_leaks=0 native-tests/${name}
+          done
+      - name: Build Windows x86 DLL and SDK tests
+        run: |
+          i686-w64-mingw32-g++ -std=c++17 -O2 -Wall -Wextra -Wno-cast-function-type -Wno-misleading-indentation -fno-exceptions -fno-rtti -shared -static -static-libgcc native/texture_lab.cpp native/exports.def -o d3d9.dll -Wl,--no-insert-timestamp -s
+          for name in native_callbacks sky_shader; do
+            i686-w64-mingw32-g++ -std=c++17 -O1 -static tests/test_${name}.cpp -o native-tests/${name}.exe
+          done
+          python3 -c "import hashlib; from pathlib import Path; Path('DLL_SHA256.txt').write_text(hashlib.sha256(Path('d3d9.dll').read_bytes()).hexdigest()+'  d3d9.dll\n')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-build
+          path: |
+            d3d9.dll
+            DLL_SHA256.txt
+            native-tests/*.exe
+  windows:
+    needs: native
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x86
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-build
+      - name: Execute Windows SDK native tests
+        shell: pwsh
+        run: |
+          & .\native-tests\native_callbacks.exe
+          if ($LASTEXITCODE) { throw 'Callback test failed' }
+          & .\native-tests\sky_shader.exe
+          if ($LASTEXITCODE) { throw 'Sky shader test failed' }
+      - name: Windows runtime and shader assembler tests
+        run: python tools/windows_runtime_test.py
+      - name: Build standalone app and installer
+        shell: pwsh
+        run: ./tools/build_windows.ps1
+      - name: Test packaged app and installer
+        shell: pwsh
+        run: ./tools/test_installer.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TextureLab-Windows
+          path: release/*
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]'))
+    needs: windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: TextureLab-Windows
+          path: release
+      - name: Publish release after all checks pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.0.0' }}
+        run: gh release create "$RELEASE_TAG" release/* --target "$GITHUB_SHA" --title "Texture Lab $RELEASE_TAG" --notes-file RELEASE_NOTES.md

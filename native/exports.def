@@ -1,0 +1,16 @@
+LIBRARY d3d9
+EXPORTS
+Direct3DCreate9=proxyCreate9@4
+Direct3DCreate9Ex=proxyCreate9Ex@8
+D3DPERF_BeginEvent=proxyBegin@8
+D3DPERF_EndEvent=proxyEnd@0
+D3DPERF_GetStatus=proxyStatus@0
+D3DPERF_QueryRepeatFrame=proxyRepeat@0
+D3DPERF_SetMarker=proxyMarker@8
+D3DPERF_SetRegion=proxyRegion@8
+D3DPERF_SetOptions=proxyOptions@4
+DebugSetMute=proxyDebugSetMute@0
+Direct3DShaderValidatorCreate9=proxyValidator@0
+DebugSetLevel=proxyDebugSetLevel@4
+PSGPError=proxyError
+PSGPSampleTexture=proxySample
