@@ -2,8 +2,6 @@
 
 Lower graphics for Creative Destruction, made for low-end PCs and laptops.
 
-[**Download the latest version**](https://github.com/samimustafaa/low-graphics-cd/releases/latest)
-
 ## What it does
 
 - Four presets: Normal, Low, Ultra, and Potato Graphics.
@@ -29,4 +27,4 @@ Requires Windows 10/11 and the 32-bit Direct3D 9 game client. Python is included
 
 Results depend on your PC and game client. Some textures or sky effects may stay unchanged, and an FPS boost isn't guaranteed. If something goes wrong, use **Diagnostics** to save a report.
 
-Made by **sg0hann**. [MIT license](LICENSE.txt) · [Build instructions](native/BUILD.md)
+Made by **me (sami)**. [MIT license](LICENSE.txt) · [Build instructions](native/BUILD.md)
