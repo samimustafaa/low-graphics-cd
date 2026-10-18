@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import threading
@@ -56,6 +57,8 @@ class UpdateTests(unittest.TestCase):
             run.assert_not_called()
             u.start_update(candidate,digest,root,True,exe)
             args=run.call_args.args[0];self.assertIn('/TEXTURELABUPDATE=1',args);self.assertIn('/DIR='+str(exe.parent),args)
+            self.assertEqual(run.call_args.kwargs['env']['PYINSTALLER_RESET_ENVIRONMENT'],'1')
+            self.assertEqual(run.call_args.kwargs['cwd'],str(exe.parent))
             helper=root/'bundle';helper.mkdir();(helper/'TextureLab-Updater.exe').write_bytes(b'MZhelper')
             u.start_update(candidate,digest,helper,False,exe,pid=123)
             self.assertEqual(run.call_args.args[0][1:],['123',str(candidate),str(exe),digest])
@@ -65,3 +68,20 @@ class UpdateTests(unittest.TestCase):
             self.assertFalse(u.is_installed(p))
             (p.parent/'TextureLab-installed.txt').write_text('Texture Lab per-user installation\n')
             self.assertTrue(u.is_installed(p))
+
+    def test_fresh_environment_does_not_mutate_parent(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);bundle=root/'_MEIold';bundle.mkdir()
+            other=root/'tools';other.mkdir()
+            original={'_PYI_APPLICATION_HOME_DIR':str(bundle),'_PYI_ARCHIVE_FILE':'old.exe',
+                      '_PYI_PARENT_PROCESS_LEVEL':'1','_PYI_FUTURE_PRIVATE':'keep-out','_MEIPASS2':str(bundle),
+                      'PATH':os.pathsep.join((str(bundle),str(bundle/'plugins'),str(other))),
+                      'TCL_LIBRARY':str(bundle/'tcl'),'TK_LIBRARY':str(bundle/'tk'),
+                      'LOCALAPPDATA':str(root),'USER_SETTING':'keep'}
+            result=u.fresh_environment(bundle,original)
+            self.assertTrue(original['_PYI_APPLICATION_HOME_DIR'])
+            self.assertFalse(any(k.startswith('_PYI_') or k=='_MEIPASS2' for k in result))
+            self.assertEqual(result['PATH'],str(other))
+            self.assertNotIn('TCL_LIBRARY',result);self.assertNotIn('TK_LIBRARY',result)
+            self.assertEqual(result['USER_SETTING'],'keep')
+            self.assertEqual(result['PYINSTALLER_RESET_ENVIRONMENT'],'1')

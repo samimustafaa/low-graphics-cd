@@ -1,5 +1,6 @@
 """Opt-in installation of HTTPS GitHub releases; no shell commands or unverified execution."""
 from dataclasses import dataclass
+from contextlib import contextmanager
 from pathlib import Path
 import hashlib
 import json
@@ -132,6 +133,48 @@ def download_verified(release, directory, progress=None, cancelled=None):
     finally:
         temporary.unlink(missing_ok=True)
 
+def fresh_environment(bundle_dir=None, environ=None):
+    """A detached update must not reuse its parent's one-file extraction folder."""
+    result = dict(os.environ if environ is None else environ)
+    for key in list(result):
+        if key.upper().startswith('_PYI_') or key.upper() == '_MEIPASS2':
+            del result[key]
+    result['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
+    if bundle_dir:
+        bundle = Path(bundle_dir).resolve()
+        def inside(value):
+            try: return Path(value).resolve().is_relative_to(bundle)
+            except (OSError, ValueError): return False
+        for key in list(result):
+            if key.upper() in ('PATH','PYTHONPATH'):
+                result[key] = os.pathsep.join(p for p in result[key].split(os.pathsep) if not p or not inside(p))
+            elif key.upper() in ('TCL_LIBRARY','TK_LIBRARY','PYTHONHOME') and inside(result[key]):
+                del result[key]
+    return result
+
+
+@contextmanager
+def external_dll_search():
+    """Clear the inherited Windows DLL search override only around CreateProcess."""
+    if os.name != 'nt' or not getattr(sys, 'frozen', False):
+        yield
+        return
+    import ctypes as c
+    kernel = c.WinDLL('kernel32', use_last_error=True)
+    kernel.GetDllDirectoryW.argtypes = [c.c_uint, c.c_wchar_p]
+    kernel.GetDllDirectoryW.restype = c.c_uint
+    kernel.SetDllDirectoryW.argtypes = [c.c_wchar_p]
+    kernel.SetDllDirectoryW.restype = c.c_int
+    buffer = c.create_unicode_buffer(32768)
+    count = kernel.GetDllDirectoryW(len(buffer), buffer)
+    if count >= len(buffer): raise OSError('DLL search path is too long to safely preserve.')
+    previous = buffer.value if count else None
+    if not kernel.SetDllDirectoryW(None): raise c.WinError(c.get_last_error())
+    try: yield
+    finally:
+        if not kernel.SetDllDirectoryW(previous): raise c.WinError(c.get_last_error())
+
+
 def start_update(candidate, digest, root, installed=None, executable=None, pid=None):
     candidate = Path(candidate).resolve()
     if hashlib.sha256(candidate.read_bytes()).hexdigest() != digest:
@@ -148,4 +191,7 @@ def start_update(candidate, digest, root, installed=None, executable=None, pid=N
         target_helper = candidate.parent / 'TextureLab-Updater.exe'
         shutil.copy2(helper, target_helper)
         args = [str(target_helper), str(pid or os.getpid()), str(candidate), str(executable), digest]
-    return subprocess.Popen(args, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0), close_fds=True)
+    environment = fresh_environment(getattr(sys, '_MEIPASS', None))
+    with external_dll_search():
+        return subprocess.Popen(args, env=environment, cwd=str(executable.parent),
+                                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0), close_fds=True)

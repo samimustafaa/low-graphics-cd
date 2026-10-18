@@ -29,6 +29,11 @@ static bool moveRetry(const std::wstring& from,const std::wstring& to) {
     for(int i=0;i<200;++i){if(MoveFileExW(from.c_str(),to.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))return true;Sleep(50);}return false;
 }
 static bool launch(const wchar_t* executable) {
+    // This helper may have been started by a frozen app with private bootloader
+    // state. The restarted EXE must unpack a fresh runtime after its parent exits.
+    if(!SetEnvironmentVariableW(L"PYINSTALLER_RESET_ENVIRONMENT",L"1") || !SetDllDirectoryW(nullptr))return false;
+    for(const wchar_t* key:{L"_PYI_APPLICATION_HOME_DIR",L"_PYI_ARCHIVE_FILE",L"_PYI_PARENT_PROCESS_LEVEL",L"_PYI_SPLASH_IPC",L"_MEIPASS2"})
+        SetEnvironmentVariableW(key,nullptr);
     STARTUPINFOW startup={};startup.cb=sizeof(startup);PROCESS_INFORMATION process={};
     std::wstring command=L"\""+std::wstring(executable)+L"\"";
     if(!CreateProcessW(executable,&command[0],nullptr,nullptr,FALSE,0,nullptr,nullptr,&startup,&process))return false;

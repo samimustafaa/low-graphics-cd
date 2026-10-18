@@ -4,7 +4,7 @@ A minimal Windows graphics control app for the 32-bit Direct3D 9 version of Crea
 
 ## Install
 
-Download **TextureLab-Setup-1.3.0.exe** from [Releases](https://github.com/samimustafaa/low-graphics-cd/releases). Install and open it. Python is included; no terminal commands are needed. The standalone `TextureLab-1.3.0.exe` is an alternative if you prefer no installation.
+Download **TextureLab-Setup-1.3.1.exe** from [Releases](https://github.com/samimustafaa/low-graphics-cd/releases). Install and open it. Python is included; no terminal commands are needed. The standalone `TextureLab-1.3.1.exe` is an alternative if you prefer no installation.
 
 1. Close the game completely.
 2. Browse to your actual `client.exe`.
@@ -74,3 +74,11 @@ The reference design is reflected in stacked rounded charcoal panels, lavender p
 Potato Graphics now covers ordinary mipmapped cubemaps (commonly used for skies/environment maps) through their own Direct3D interface. This can also soften reflections. Render-target/depth cubemaps and unsupported non-mipmapped resources are excluded. Other presets retain their previous scope. The optional recognized-sky replacement already outputs a flat gray color without texture reads; unknown sky shaders are not replaced. The app cannot identify character/weapon/skin assets individually or guarantee they all use eligible mip chains.
 
 After updating the app, close the game, click **Install / update**, select **Potato Graphics**, and **Apply preset** to install the 1.3.0 renderer and use the stronger settings. A control-app update alone does not replace the DLL in the game directory.
+
+## 1.3.1 updater restart fix
+
+Detached update processes now receive a fresh PyInstaller environment instead of inheriting the running app's extraction folder. The app removes private bootloader variables and bundle-owned search paths from the child environment, requests a fresh one-file launch, and temporarily resets Windows DLL search state around spawning the updater. The original app process's environment/search state is retained.
+
+The portable helper independently resets its relaunch environment. The installer also requests a fresh runtime before reopening the app, including when launched by an older installed updater. This fixes the restart path associated with `Failed to load Python DLL ... _MEI.../python312.dll` after the parent app removes its temporary folder. If an older portable updater hits this error during its first transition, close the error and open the updated EXE directly from Explorer; that independent launch does not inherit the old process environment.
+
+New regression fixtures build actual one-file parent and child executables, exercise portable and installed updates, and assert different runtime folders plus removal of the original folder. They also test the new native helper with a deliberately inherited environment and the new installer launched the way older app versions launched it. The game renderer remains 1.3.0; no game-helper reinstall is needed for this updater-only fix.

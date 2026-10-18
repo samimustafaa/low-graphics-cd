@@ -7,7 +7,7 @@ Get-Content $smoke
 $result = Get-Content $smoke -Raw | ConvertFrom-Json
 if (!$result.bundle_hash_ok -or !$result.fake_install_apply_restore_ok) { throw "Packaged smoke assertions failed: $(Get-Content $smoke -Raw)" }
 $target = Join-Path $env:TEMP 'TextureLab-install-test'
-$p = Start-Process -FilePath "$PWD\release\TextureLab-Setup-1.3.0.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$target`"" -Wait -PassThru
+$p = Start-Process -FilePath "$PWD\release\TextureLab-Setup-1.3.1.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$target`"" -Wait -PassThru
 if ($p.ExitCode -ne 0 -or !(Test-Path "$target\TextureLab.exe")) { throw 'Silent installer failed' }
 if (!(Test-Path "$target\TextureLab-installed.txt")) { throw 'Installed update marker missing' }
 $installed = Join-Path $env:TEMP 'TextureLab-installed-smoke.json'
@@ -21,3 +21,6 @@ python tools/windows_app_lifecycle_test.py "$target"
 if ($LASTEXITCODE) { throw 'Installed update/relaunch and background lifecycle test failed' }
 $p = Start-Process -FilePath "$target\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
 if ($p.ExitCode -ne 0) { throw 'Uninstaller failed' }
+
+& ./tools/build_frozen_update_probe.ps1
+if ($LASTEXITCODE) { throw 'Frozen update regression tests failed' }

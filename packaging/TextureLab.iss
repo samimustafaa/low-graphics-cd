@@ -1,4 +1,4 @@
-#define AppVersion "1.3.0"
+#define AppVersion "1.3.1"
 [Setup]
 AppId={{5AF53953-9946-4A0A-BD65-2ED4641369B1}
 AppName=Texture Lab
@@ -27,10 +27,22 @@ Name: "{autodesktop}\Texture Lab"; Filename: "{app}\TextureLab.exe"; Tasks: desk
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 [Run]
-Filename: "{app}\TextureLab.exe"; Description: "Open Texture Lab"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\TextureLab.exe"; Description: "Open Texture Lab"; Flags: nowait postinstall skipifsilent; BeforeInstall: PrepareAppLaunch
 
-Filename: "{app}\TextureLab.exe"; Flags: nowait; Check: IsUpdateInstall
+Filename: "{app}\TextureLab.exe"; Flags: nowait; Check: IsUpdateInstall; BeforeInstall: PrepareAppLaunch
 [Code]
+function SetProcessEnvironment(Name, Value: String): Boolean;
+  external 'SetEnvironmentVariableW@kernel32.dll stdcall';
+function ResetDllSearch(Path: LongWord): Boolean;
+  external 'SetDllDirectoryW@kernel32.dll stdcall';
+procedure PrepareAppLaunch;
+begin
+  { Also repairs the handoff from older app versions whose updater inherited
+    PyInstaller's temporary runtime. This affects this installer process only. }
+  if not SetProcessEnvironment('PYINSTALLER_RESET_ENVIRONMENT', '1') then
+    RaiseException('Could not prepare a fresh Texture Lab runtime. Reopen the app from its shortcut.');
+  ResetDllSearch(0);
+end;
 function IsUpdateInstall: Boolean;
 begin
   Result := ExpandConstant('{param:TEXTURELABUPDATE|0}') = '1';
