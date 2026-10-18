@@ -26,11 +26,13 @@ class UITests(unittest.TestCase):
             exe.write_bytes(data)
             app.path.set(str(exe)); app.load_selected()
             with patch.object(core, 'require_closed', lambda value: None):
-                app.install(); self.assertIn('1.4.0', app.install_status.get())
+                app.install(); self.assertIn('1.5.0', app.install_status.get())
                 app.select(4); app.apply(); self.assertEqual(core.read_settings(exe.parent)['bias'], 10)
                 app.load_selected(); self.assertEqual(app.profile.get(), 4)
-                app.choose_profile(6); app.apply(); self.assertEqual(core.read_settings(exe.parent)['bias'], 15)
+                app.choose_profile(6); app.flat_ground.set(True); app.apply(); self.assertEqual(core.read_settings(exe.parent)['bias'], 15)
                 app.load_selected(); self.assertEqual(app.profile.get(), 6)
+                self.assertTrue(core.read_settings(exe.parent)['flat_ground'])
+                self.assertTrue(app.flat_ground.get())
                 self.assertTrue(core.read_settings(exe.parent)['neutral_sky'])
                 app.black_sky.set(True)
                 self.assertFalse(core.read_settings(exe.parent)['black_sky'])
@@ -72,10 +74,19 @@ class UITests(unittest.TestCase):
         app.reveal(); self.assertFalse(app.hidden); root.update()
         with patch('texture_ui.messagebox.askyesno',return_value=False) as popup:
             from update_manager import Release
-            r=Release('1.4.0','file','','1','','')
+            r=Release('1.6.0','file','',1,'','')
             app.offer_update(r,False); popup.assert_called_once()
-            app.offer_update(r,False); popup.assert_called_once()
-            app.offer_update(r,True); self.assertEqual(popup.call_count,2)
+            root.update()
+            self.assertTrue(app.update_banner.winfo_ismapped())
+            self.assertEqual(app.update_banner.cget('text'),'New update - update the app now')
+            self.assertIn('bold',app.update_banner.cget('font'))
+            app.show('About');root.update();self.assertTrue(app.update_banner.winfo_ismapped())
+            app.show('Graphics');root.update()
+            self.assertLessEqual(app.content.winfo_reqheight(),app.content.winfo_height())
+            app.open_available_update();self.assertEqual(popup.call_count,2)
+            app.offer_update(r,False); self.assertEqual(popup.call_count,2)
+            app.offer_update(r,True); self.assertEqual(popup.call_count,3)
+            app.offer_update(None,False);root.update();self.assertFalse(app.update_banner.winfo_ismapped())
         app.close(); app.tray.stop.assert_called_once()
 
     def test_compact_pages_fit_and_buttons_support_pointer_and_keyboard(self):

@@ -246,7 +246,7 @@ static void fillDeviceTable(DeviceContext* c) {
     c->entries[88]=(void*)forwardDevice_GetVertexDeclaration;
     c->entries[89]=(void*)forwardDevice_SetFVF;
     c->entries[90]=(void*)forwardDevice_GetFVF;
-    c->entries[91]=(void*)forwardDevice_CreateVertexShader;
+    c->entries[91]=(void*)createVertexShader;
     c->entries[92]=(void*)forwardDevice_SetVertexShader;
     c->entries[93]=(void*)forwardDevice_GetVertexShader;
     c->entries[94]=(void*)forwardDevice_SetVertexShaderConstantF;

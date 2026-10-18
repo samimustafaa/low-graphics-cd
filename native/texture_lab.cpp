@@ -1,4 +1,4 @@
-// Texture Lab 1.4.0. Public COM forwarding wrappers. System objects, private
+// Texture Lab 1.5.0. Public COM forwarding wrappers. System objects, private
 // runtime layouts and runtime vtables are never modified. Original MIT source.
 #define CINTERFACE
 #define COBJMACROS
@@ -15,7 +15,7 @@
 #include <string.h>
 #include <wchar.h>
 #include <stdio.h>
-#include "sky_shader.h"
+#include "ground_shader.h"
 
 
 static HMODULE selfModule, systemD3D;
@@ -47,14 +47,14 @@ static BOOL CALLBACK initialize(PINIT_ONCE, PVOID, PVOID*) {
     HMODULE pinned;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,
                       (LPCWSTR)selfModule,&pinned);
-    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.4.0 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
+    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.5.0 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
     logLine(line); return TRUE;
 }
 static FARPROC resolve(const char* name) {
     InitOnceExecuteOnce(&initOnce,initialize,nullptr,nullptr);
     return systemD3D?GetProcAddress(systemD3D,name):nullptr;
 }
-struct Config { bool enabled; int bias; UINT minSize; bool bypass; bool neutralSky, includeAutogen, allowMipmaps; UINT minimumMip; bool collectStats; bool blackSky; };
+struct Config { bool enabled; int bias; UINT minSize; bool bypass; bool neutralSky, includeAutogen, allowMipmaps; UINT minimumMip; bool collectStats; bool blackSky; bool flatGround; };
 static Config readConfig() {
     int bias=(int)GetPrivateProfileIntW(L"TextureLab",L"Bias",2,iniPath);
     int size=(int)GetPrivateProfileIntW(L"TextureLab",L"MinTextureSize",256,iniPath);
@@ -67,7 +67,8 @@ static Config readConfig() {
             GetPrivateProfileIntW(L"TextureLab",L"ForceMipFilter",0,iniPath)!=0,
             (UINT)(minimumMip<0?0:(minimumMip>4?4:minimumMip)),
             GetPrivateProfileIntW(L"TextureLab",L"CollectStats",0,iniPath)!=0,
-            GetPrivateProfileIntW(L"TextureLab",L"BlackSky",0,iniPath)!=0};
+            GetPrivateProfileIntW(L"TextureLab",L"BlackSky",0,iniPath)!=0,
+            GetPrivateProfileIntW(L"TextureLab",L"FlatGround",0,iniPath)!=0};
 }
 struct CallGuard {
     bool outer;
@@ -89,7 +90,7 @@ struct DeviceContext {
     void* entries[deviceSlots]; volatile LONG refs; bool ex;
     volatile LONG callbacks, dead, blocked, recording, renderThread;
     Config config; ULONGLONG lastPoll, nextLog;
-    unsigned long eligibleBinds, modifications, failures, otherThread, shaderChecks, graySkies, lateBiasWrites, disabledMipWrites, mipChanges, noMipBinds, mipFloorChanges;
+    unsigned long eligibleBinds, modifications, failures, otherThread, shaderChecks, graySkies, lateBiasWrites, disabledMipWrites, mipChanges, noMipBinds, mipFloorChanges, flatGrounds, hiddenGrass;
     Sampler samplers[16];
 };
 struct FactoryContext {
@@ -135,26 +136,53 @@ static HRESULT STDMETHODCALLTYPE queryFactory(IDirect3D9* d,REFIID iid,void** ou
 static HRESULT STDMETHODCALLTYPE createPixelShader(IDirect3DDevice9* d,const DWORD* code,IDirect3DPixelShader9** out) {
     auto c=ctx(d); Hold<DeviceContext> hold(c); CallGuard entry;
     HRESULT hr=c->original->CreatePixelShader(c->real,code,out);
-    if(!entry.outer || FAILED(hr) || !out || !*out || !c->config.enabled || !c->config.neutralSky || c->config.bypass)return hr;
+    if(!entry.outer || FAILED(hr) || !out || !*out || !c->config.enabled || (!c->config.neutralSky && !c->config.flatGround) || c->config.bypass)return hr;
     ++c->shaderChecks;
     UINT bytes=0;
     if(FAILED(IDirect3DPixelShader9_GetFunction(*out,nullptr,&bytes)) || bytes<8 || bytes>1024*1024 || bytes%4)return hr;
     UINT capacity=bytes;
     auto original=(DWORD*)HeapAlloc(GetProcessHeap(),0,capacity);
     if(!original)return hr;
-    SkyMetadata match={};
+    SkyMetadata match={};bool terrain=false;
     if(SUCCEEDED(IDirect3DPixelShader9_GetFunction(*out,original,&bytes)) && bytes<=capacity && bytes%4==0 &&
-       findSkyMetadata((const uint32_t*)original,bytes/4,&match)) {
+       ((c->config.flatGround && (terrain=groundKind((const uint32_t*)original,bytes/4,&match)==GroundShader::Terrain)) ||
+        (c->config.neutralSky && findSkyMetadata((const uint32_t*)original,bytes/4,&match)))) {
         size_t words=graySkyWordCount(match);
         auto gray=(DWORD*)HeapAlloc(GetProcessHeap(),0,words*4);
         if(gray) {
-            makeGraySky(match,(uint32_t*)gray,c->config.blackSky);IDirect3DPixelShader9* replacement=nullptr;
+            if(terrain)makeFlatGround(match,(uint32_t*)gray);else makeGraySky(match,(uint32_t*)gray,c->config.blackSky);IDirect3DPixelShader9* replacement=nullptr;
             HRESULT replacementHR=c->original->CreatePixelShader(c->real,gray,&replacement);
             if(SUCCEEDED(replacementHR) && replacement) {
-                IDirect3DPixelShader9_Release(*out);*out=replacement;++c->graySkies;
-                logLine(c->config.blackSky?"Black sky shader created; sky metadata matched.":"Neutral gray sky shader created; sky metadata matched.");
-            } else logLine("Solid sky shader rejected; original shader retained.");
+                IDirect3DPixelShader9_Release(*out);*out=replacement;if(terrain)++c->flatGrounds;else ++c->graySkies;
+                logLine(terrain?"Flat ground shader created; terrain metadata matched.":c->config.blackSky?"Black sky shader created; sky metadata matched.":"Neutral gray sky shader created; sky metadata matched.");
+            } else logLine("Solid shader rejected; original shader retained.");
             HeapFree(GetProcessHeap(),0,gray);
+        }
+    }
+    HeapFree(GetProcessHeap(),0,original);return hr;
+}
+static HRESULT STDMETHODCALLTYPE createVertexShader(IDirect3DDevice9* d,const DWORD* code,IDirect3DVertexShader9** out) {
+    auto c=ctx(d);Hold<DeviceContext> hold(c);CallGuard entry;
+    HRESULT hr=c->original->CreateVertexShader(c->real,code,out);
+    if(!entry.outer || FAILED(hr) || !out || !*out || !c->config.enabled || !c->config.flatGround || c->config.bypass)return hr;
+    UINT bytes=0;
+    if(FAILED(IDirect3DVertexShader9_GetFunction(*out,nullptr,&bytes)) || bytes<8 || bytes>1024*1024 || bytes%4)return hr;
+    UINT capacity=bytes;auto original=(DWORD*)HeapAlloc(GetProcessHeap(),0,capacity);
+    if(!original)return hr;
+    SkyMetadata match={};
+    if(SUCCEEDED(IDirect3DVertexShader9_GetFunction(*out,original,&bytes)) && bytes<=capacity && bytes%4==0 &&
+       groundKind((const uint32_t*)original,bytes/4,&match)==GroundShader::Grass) {
+        size_t words=makeNoGrass((const uint32_t*)original,bytes/4,match,nullptr);
+        auto hidden=words?(DWORD*)HeapAlloc(GetProcessHeap(),0,words*4):nullptr;
+        if(hidden) {
+            makeNoGrass((const uint32_t*)original,bytes/4,match,(uint32_t*)hidden);
+            IDirect3DVertexShader9* replacement=nullptr;
+            HRESULT result=c->original->CreateVertexShader(c->real,hidden,&replacement);
+            if(SUCCEEDED(result) && replacement) {
+                IDirect3DVertexShader9_Release(*out);*out=replacement;++c->hiddenGrass;
+                logLine("No grass shader created; grass metadata matched.");
+            } else logLine("No grass shader rejected; original shader retained.");
+            HeapFree(GetProcessHeap(),0,hidden);
         }
     }
     HeapFree(GetProcessHeap(),0,original);return hr;
@@ -168,8 +196,8 @@ static void poll(DeviceContext* c) {
     ULONGLONG now=GetTickCount64();
     // Settings change only between game sessions; no per-bind INI reads.
     if(now>=c->nextLog) {
-        char line[240]; snprintf(line,sizeof(line),"pid=%lu thread=%ld bias=%d enabled=%d eligible=%lu changed=%lu failed=%lu other_thread=%lu blocked=%ld shaders=%lu gray_skies=%lu late_bias=%lu disabled_mip=%lu mip_changes=%lu no_mips=%lu mip_floor=%lu",
-            GetCurrentProcessId(),c->renderThread,c->config.bias,c->config.enabled,c->eligibleBinds,c->modifications,c->failures,c->otherThread,c->blocked,c->shaderChecks,c->graySkies,c->lateBiasWrites,c->disabledMipWrites,c->mipChanges,c->noMipBinds,c->mipFloorChanges);
+        char line[384]; snprintf(line,sizeof(line),"pid=%lu thread=%ld bias=%d enabled=%d eligible=%lu changed=%lu failed=%lu other_thread=%lu blocked=%ld shaders=%lu gray_skies=%lu late_bias=%lu disabled_mip=%lu mip_changes=%lu no_mips=%lu mip_floor=%lu flat_ground=%lu hidden_grass=%lu",
+            GetCurrentProcessId(),c->renderThread,c->config.bias,c->config.enabled,c->eligibleBinds,c->modifications,c->failures,c->otherThread,c->blocked,c->shaderChecks,c->graySkies,c->lateBiasWrites,c->disabledMipWrites,c->mipChanges,c->noMipBinds,c->mipFloorChanges,c->flatGrounds,c->hiddenGrass);
         logLine(line); c->nextLog=now+10000;
     }
 }
@@ -389,7 +417,7 @@ static ULONG STDMETHODCALLTYPE releaseFactory(IDirect3D9* d) {
 static void fillDeviceTable(DeviceContext* c) {
     IDirect3DDevice9ExVtbl t={}; t.QueryInterface=queryDevice;t.AddRef=addDevice;t.Release=releaseDevice;
     t.SetTexture=texture;t.SetSamplerState=sampler;t.Reset=reset;t.ResetEx=resetEx;
-    t.BeginStateBlock=beginBlock;t.EndStateBlock=endBlock;t.CreatePixelShader=createPixelShader; memcpy(c->entries,&t,sizeof(t));
+    t.BeginStateBlock=beginBlock;t.EndStateBlock=endBlock;t.CreatePixelShader=createPixelShader;t.CreateVertexShader=createVertexShader; memcpy(c->entries,&t,sizeof(t));
 }
 static void fillFactoryTable(FactoryContext* c) {
     IDirect3D9ExVtbl t={};t.QueryInterface=queryFactory;t.AddRef=addFactory;t.Release=releaseFactory;

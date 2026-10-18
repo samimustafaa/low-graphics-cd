@@ -85,6 +85,16 @@ class ManagerTests(unittest.TestCase):
         m.install_or_update(self.folder, self.dll + b'new')
         self.assertEqual((self.folder / m.INI).read_bytes(), before)
 
+    def test_flat_ground_is_optional_potato_only_and_roundtrips(self):
+        self.assertIn(b"FlatGround=0", m.settings(6))
+        for mode in (0,2,4,6):
+            self.assertIn(f"FlatGround={int(mode == 6)}".encode(),m.settings(mode, flat_ground=True))
+        m.install(self.folder,self.dll)
+        m.save_preset(self.folder,6,flat_ground=True)
+        self.assertTrue(m.read_settings(self.folder)['flat_ground'])
+        m.save_preset(self.folder,6,flat_ground=False)
+        self.assertFalse(m.read_settings(self.folder)['flat_ground'])
+
     def test_default_install_uses_former_potato_as_low(self):
         m.install(self.folder, self.dll)
         parser = configparser.ConfigParser()
@@ -103,7 +113,7 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(result, "updated")
         self.assertEqual((self.folder / m.DLL).read_bytes(), b"replacement DLL")
         self.assertEqual(game.read_bytes(), b"game stays original")
-        self.assertEqual(json.loads(manifest.read_text())["build_version"], "1.4.0")
+        self.assertEqual(json.loads(manifest.read_text())["build_version"], "1.5.0")
         self.assertEqual(list(self.folder.glob("TextureLab_recovery_*")), [])
 
     def test_failed_update_rolls_back_dll_settings_and_manifest(self):

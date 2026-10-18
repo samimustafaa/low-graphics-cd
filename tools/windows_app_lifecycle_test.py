@@ -13,7 +13,7 @@ user.GetWindowThreadProcessId.argtypes=[w.HWND,c.POINTER(w.DWORD)]
 kernel.OpenProcess.argtypes=[w.DWORD,w.BOOL,w.DWORD];kernel.OpenProcess.restype=w.HANDLE
 kernel.WaitForSingleObject.argtypes=[w.HANDLE,w.DWORD];kernel.WaitForSingleObject.restype=w.DWORD
 kernel.CloseHandle.argtypes=[w.HANDLE]
-installer=Path('release/TextureLab-Setup-1.4.0.exe').resolve()
+installer=Path('release/TextureLab-Setup-1.5.0.exe').resolve()
 # subprocess waits for the installer itself, rather than its relaunched app tree.
 subprocess.run([str(installer),'/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/TEXTURELABUPDATE=1','/DIR='+str(Path(sys.argv[1]).resolve())],check=True,timeout=60)
 def wait_for(predicate):
@@ -23,7 +23,7 @@ def wait_for(predicate):
         if value:return value
         time.sleep(.1)
     raise AssertionError('Packaged lifecycle step timed out')
-window=wait_for(lambda:user.FindWindowW(None,'Texture Lab 1.4.0'))
+window=wait_for(lambda:user.FindWindowW(None,'Texture Lab 1.5.0'))
 tray=wait_for(lambda:user.FindWindowW(tray_icon.CLASS_NAME,tray_icon.WINDOW_TITLE))
 pid=w.DWORD();user.GetWindowThreadProcessId(window,c.byref(pid))
 process=kernel.OpenProcess(0x100000,False,pid.value);assert process

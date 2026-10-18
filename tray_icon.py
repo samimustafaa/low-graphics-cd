@@ -32,7 +32,7 @@ def _apis():
         'TranslateMessage':([c.POINTER(w.MSG)],w.BOOL),'DispatchMessageW':([c.POINTER(w.MSG)],LRESULT),
         'PostQuitMessage':([c.c_int],None),'RegisterWindowMessageW':([w.LPCWSTR],w.UINT),
         'LoadImageW':([w.HINSTANCE,w.LPCWSTR,w.UINT,c.c_int,c.c_int,w.UINT],w.HANDLE),
-        'DestroyIcon':([w.HICON],w.BOOL),'CreatePopupMenu':([],w.HMENU),
+        'GetSystemMetrics':([c.c_int],c.c_int),'DestroyIcon':([w.HICON],w.BOOL),'CreatePopupMenu':([],w.HMENU),
         'AppendMenuW':([w.HMENU,w.UINT,c.c_size_t,w.LPCWSTR],w.BOOL),
         'TrackPopupMenu':([w.HMENU,w.UINT,c.c_int,c.c_int,c.c_int,w.HWND,c.c_void_p],w.UINT),
         'DestroyMenu':([w.HMENU],w.BOOL),'GetCursorPos':([c.POINTER(w.POINT)],w.BOOL),
@@ -93,7 +93,7 @@ class TrayIcon:
             registered=True
             self.window=user.CreateWindowExW(0,CLASS_NAME,WINDOW_TITLE,0,0,0,0,0,None,None,instance,None)
             if not self.window:raise OSError(c.get_last_error(),'Cannot create tray window')
-            icon=user.LoadImageW(None,self.icon_path,1,32,32,0x10)
+            icon=user.LoadImageW(None,self.icon_path,1,user.GetSystemMetrics(49),user.GetSystemMetrics(50),0x10)
             if not icon:raise OSError(c.get_last_error(),'Cannot load tray icon')
             self.data=NOTIFYICONDATA();self.data.size=c.sizeof(self.data);self.data.window=self.window
             self.data.id=1;self.data.flags=1|2|4;self.data.message=WM_ACTION;self.data.icon=icon

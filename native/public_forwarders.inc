@@ -331,10 +331,7 @@ static HRESULT STDMETHODCALLTYPE forwardDevice_GetFVF(IDirect3DDevice9* self, DW
     auto c=ctx((IDirect3DDevice9*)self); Hold<DeviceContext> hold(c);
     return ((const IDirect3DDevice9Vtbl*)c->original)->GetFVF((IDirect3DDevice9*)c->real, fvf);
 }
-static HRESULT STDMETHODCALLTYPE forwardDevice_CreateVertexShader(IDirect3DDevice9* self, const DWORD *byte_code, IDirect3DVertexShader9 **shader) {
-    auto c=ctx((IDirect3DDevice9*)self); Hold<DeviceContext> hold(c);
-    return ((const IDirect3DDevice9Vtbl*)c->original)->CreateVertexShader((IDirect3DDevice9*)c->real, byte_code, shader);
-}
+
 static HRESULT STDMETHODCALLTYPE forwardDevice_SetVertexShader(IDirect3DDevice9* self, IDirect3DVertexShader9 *shader) {
     auto c=ctx((IDirect3DDevice9*)self); Hold<DeviceContext> hold(c);
     return ((const IDirect3DDevice9Vtbl*)c->original)->SetVertexShader((IDirect3DDevice9*)c->real, shader);

@@ -4,7 +4,7 @@ A minimal Windows graphics control app for the 32-bit Direct3D 9 version of Crea
 
 ## Install
 
-Download **TextureLab-Setup-1.4.0.exe** from [Releases](https://github.com/samimustafaa/low-graphics-cd/releases). Install and open it. Python is included; no terminal commands are needed. The standalone `TextureLab-1.4.0.exe` is an alternative if you prefer no installation.
+Download **TextureLab-Setup-1.5.0.exe** from [Releases](https://github.com/samimustafaa/low-graphics-cd/releases). Install and open it. Python is included; no terminal commands are needed. The standalone `TextureLab-1.5.0.exe` is an alternative if you prefer no installation.
 
 1. Close the game completely.
 2. Browse to your actual `client.exe`.
@@ -61,7 +61,7 @@ Native build details are in [native/BUILD.md](native/BUILD.md). On Windows with 
 
 ## Background mode and automatic updates
 
-Install 1.2.0 once to receive the updater; older releases cannot update themselves. The standalone app checks this repository's latest stable GitHub release on opening and every six hours while running. A popup offers a newer version; nothing downloads or installs until accepted. About and the tray menu also offer **Check for updates**. Failed automatic checks stay quiet. A failed manual check/download shows an error and leaves the app installed.
+Install 1.2.0 once to receive the updater; older releases cannot update themselves. The standalone app checks this repository's latest stable GitHub release on opening and every five minutes while running. A popup offers a newer version; nothing downloads or installs until accepted. About and the tray menu also offer **Check for updates**. Failed automatic checks stay quiet. A failed manual check/download shows an error and leaves the app installed.
 
 Downloads use HTTPS, repository/version/filename checks, a 64 MiB bound, exact size and SHA-256 verification from the release's checksum file. This is integrity verification against the GitHub release, not independent publisher authentication. Installed copies use the per-user installer and reopen after an update. Portable copies use a separate bundled helper that waits for the app to exit, verifies the staged executable, retains `.previous`, swaps and relaunches; failed swaps/launches attempt restoration. Protected/read-only portable folders may require moving the app to a writable folder or using the installer. Updating the control app does not replace an already installed game-directory graphics helper: close the game and click **Install / update** to install the new bundled renderer, then Apply.
 
@@ -86,3 +86,11 @@ New regression fixtures build actual one-file parent and child executables, exer
 ## 1.4.0 optional black sky
 
 Close the game, update the app, click **Install / update** for the new renderer, choose **Potato Graphics**, enable **Sky**, select **Black**, and click **Apply preset**. Launch the game again. **Gray** remains the default; turn Sky off for the original sky. Texture strengths and updater fixes are unchanged. Only recognized sky shaders change; clouds or post-processing may still affect the final sky. Black is a visual option, not an additional guaranteed FPS increase over gray.
+
+## 1.5.0 no grass, flat ground and visible updates
+
+Close the game, update the app, click **Install / update**, choose **Potato Graphics**, enable **No grass + flat ground**, and **Apply preset**. Restart the game. The option is off by default; Low/Ultra and sky choices retain their existing behavior. Recognized grass vertex shaders collapse to a single clipped position, removing rendered grass and its depth. Recognized terrain pixel shaders output muted green without terrain texture reads. Terrain geometry, hills and collision stay intact. Exact constant-name combinations from the supplied shader sources identify eligible shaders. Unknown/stripped, water and hole shaders remain original; rejected replacements retain the original shader. The running client needs an in-game coverage/performance check. Look for **No grass shader created** and **Flat ground shader created** in its diagnostic log. Disable, Apply and restart to restore those shaders.
+
+A bold, clickable **New update - update the app now** banner stays visible on every page after a newer compatible release is detected, even if its popup is dismissed. Checks run on opening and every five minutes while open or in the tray. Publish a newer numbered GitHub release with the Windows executable assets and checksums to trigger it; source commits alone do not trigger update notices.
+
+The TL icon has a vector master, 1024 px brand image, native PNG frames and a multi-size Windows ICO. Tk and the tray use native frames instead of rough subsampling. Regenerate assets with `python tools/build_icons.py` (Pillow needed only to build). Existing pinned shortcuts may need repinning if Windows cached their previous icon.

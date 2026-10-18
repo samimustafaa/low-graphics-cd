@@ -33,6 +33,7 @@ struct INIT_ONCE {bool ran;};using PINIT_ONCE=INIT_ONCE*;
 #define INIT_ONCE_STATIC_INIT {false}
 struct D3DPRESENT_PARAMETERS {};struct D3DDISPLAYMODEEX {};struct IDirect3DStateBlock9 {};
 struct D3DSURFACE_DESC {DWORD Usage,Width,Height;};
+struct IDirect3DVertexShader9;
 struct IDirect3DPixelShader9;
 struct IDirect3DDevice9;struct IDirect3DDevice9Ex;struct IDirect3D9;struct IDirect3D9Ex;struct IDirect3DTexture9;
 using IDirect3DBaseTexture9=IDirect3DTexture9;
@@ -46,7 +47,8 @@ using IDirect3DCubeTexture9=IDirect3DTexture9;
  HRESULT(*Reset)(IDirect3DDevice9*,D3DPRESENT_PARAMETERS*); \
  HRESULT(*BeginStateBlock)(IDirect3DDevice9*); \
  HRESULT(*EndStateBlock)(IDirect3DDevice9*,IDirect3DStateBlock9**); \
- HRESULT(*CreatePixelShader)(IDirect3DDevice9*,const DWORD*,IDirect3DPixelShader9**)
+ HRESULT(*CreatePixelShader)(IDirect3DDevice9*,const DWORD*,IDirect3DPixelShader9**); \
+ HRESULT(*CreateVertexShader)(IDirect3DDevice9*,const DWORD*,IDirect3DVertexShader9**)
 struct IDirect3DDevice9Vtbl {DEVICE_PREFIX;};
 struct IDirect3DDevice9ExVtbl {DEVICE_PREFIX;HRESULT(*ResetEx)(IDirect3DDevice9Ex*,D3DPRESENT_PARAMETERS*,D3DDISPLAYMODEEX*);};
 struct IDirect3DDevice9 {const IDirect3DDevice9Vtbl*lpVtbl;};
@@ -63,6 +65,10 @@ struct IDirect3DPixelShader9Vtbl {ULONG(*Release)(IDirect3DPixelShader9*);HRESUL
 struct IDirect3DPixelShader9 {const IDirect3DPixelShader9Vtbl*lpVtbl;};
 #define IDirect3DPixelShader9_GetFunction(s,p,n) ((s)->lpVtbl->GetFunction(s,p,n))
 #define IDirect3DPixelShader9_Release(s) ((s)->lpVtbl->Release(s))
+struct IDirect3DVertexShader9Vtbl {ULONG(*Release)(IDirect3DVertexShader9*);HRESULT(*GetFunction)(IDirect3DVertexShader9*,void*,UINT*);};
+struct IDirect3DVertexShader9 {const IDirect3DVertexShader9Vtbl*lpVtbl;};
+#define IDirect3DVertexShader9_GetFunction(s,p,n) ((s)->lpVtbl->GetFunction(s,p,n))
+#define IDirect3DVertexShader9_Release(s) ((s)->lpVtbl->Release(s))
 struct IDirect3DTexture9Vtbl {D3DRESOURCETYPE(*GetType)(IDirect3DTexture9*);DWORD(*GetLevelCount)(IDirect3DTexture9*);HRESULT(*GetLevelDesc)(IDirect3DTexture9*,UINT,D3DSURFACE_DESC*);};
 struct IDirect3DTexture9 {const IDirect3DTexture9Vtbl*lpVtbl;};
 #define IDirect3DDevice9_SetTexture(d,a,b) ((d)->lpVtbl->SetTexture(d,a,b))

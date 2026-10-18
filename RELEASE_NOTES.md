@@ -1,10 +1,10 @@
-# Texture Lab 1.4.0
+# Texture Lab 1.5.0
 
-- Added an optional **Black** sky next to **Gray** under Potato Graphics. Gray remains the default.
-- Updating the game helper now preserves your applied settings.
-- Sky selection is saved when you apply; existing texture preset strengths and updater fixes are unchanged.
-- Recognized sky shaders output solid black without texture reads. Unknown shaders remain untouched; clouds and post-processing may still affect the appearance.
+- Added optional **No grass + flat ground** under Potato Graphics. Recognized grass stops rendering; recognized terrain uses flat muted green. Low, Ultra and sky behavior are preserved.
+- Rebuilt the TL icon from vector shapes with native frames for taskbar, tray, shortcuts and high-DPI screens.
+- Added a persistent, bold **New update - update the app now** banner. Click to reopen its update prompt after dismissing the popup. Checks run at launch and every five minutes while open or in the tray.
+- Applied settings are preserved when updating the game helper.
 
-**To enable:** close the game, update Texture Lab, click **Install / update**, choose **Potato Graphics**, enable **Sky**, select **Black**, then **Apply preset** and launch the game. Updating only the app does not replace the game helper.
+**Enable:** close the game, update Texture Lab, click **Install / update**, choose **Potato Graphics**, enable **No grass + flat ground**, click **Apply preset**, and restart the game. The option is off by default.
 
-Black is a visual choice; it does not guarantee an extra FPS increase over gray. No separate Python installation is needed.
+Only recognized shaders change. Unknown/stripped shaders, water, terrain holes and collision remain original. Some client variants may retain grass or ground detail; test in-game to confirm coverage and performance. FPS increases are not guaranteed. Disable the option, Apply and restart to restore its original shaders.
