@@ -4,7 +4,7 @@ A minimal Windows graphics control app for the 32-bit Direct3D 9 version of Crea
 
 ## Install
 
-Download **TextureLab-Setup-1.5.0.exe** from [Releases](https://github.com/samimustafaa/low-graphics-cd/releases). Install and open it. Python is included; no terminal commands are needed. The standalone `TextureLab-1.5.0.exe` is an alternative if you prefer no installation.
+Download **TextureLab-Setup-1.5.1.exe** from [Releases](https://github.com/samimustafaa/low-graphics-cd/releases). Install and open it. Python is included; no terminal commands are needed. The standalone `TextureLab-1.5.1.exe` is an alternative if you prefer no installation.
 
 1. Close the game completely.
 2. Browse to your actual `client.exe`.
@@ -94,3 +94,9 @@ Close the game, update the app, click **Install / update**, choose **Potato Grap
 A bold, clickable **New update - update the app now** banner stays visible on every page after a newer compatible release is detected, even if its popup is dismissed. Checks run on opening and every five minutes while open or in the tray. Publish a newer numbered GitHub release with the Windows executable assets and checksums to trigger it; source commits alone do not trigger update notices.
 
 The TL icon has a vector master, 1024 px brand image, native PNG frames and a multi-size Windows ICO. Tk and the tray use native frames instead of rough subsampling. Regenerate assets with `python tools/build_icons.py` (Pillow needed only to build). Existing pinned shortcuts may need repinning if Windows cached their previous icon.
+
+## 1.5.1 sky controls and skyauto_new fix
+
+The previous matcher required `skycolorlow` and `u_bg_color`, which are absent from the supplied `skyauto_new` shader. Sky recognition now also accepts the exact combination of `skycolormid`, `skycolorhigh`, `bk_cloud_color` and `cloud_thickness`. This covers the supplied cloud-bearing sky variants without matching generic building/terrain names. Gray and Black both use this recognition. Unknown/stripped shader metadata and separate effects may still keep their original appearance.
+
+Rounded Gray/Black buttons animate on hover, support pointer/keyboard selection and show the active choice. Choosing a color enables the Sky switch. They explain when Potato Graphics or Texture changes must be enabled. Apply confirms the saved sky color and reminds you to restart. **After updating, close the game and click Install / update to replace the renderer**, then select Potato Graphics, choose Gray or Black, Apply and relaunch. Merely updating the control app leaves the older game helper in place.

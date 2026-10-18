@@ -26,12 +26,13 @@ static HRESULT STDMETHODCALLTYPE shaderCreate(IDirect3DDevice9*,const DWORD* cod
     assert(memcmp(code+1,m.comment,m.words*4)==0); // Reflection comment preserved byte-for-byte.
     *out=(IDirect3DPixelShader9*)&replacement;return S_OK;
 }
-static std::vector<DWORD> fixture(bool sky=true,DWORD version=0xffff0200){
+static std::vector<DWORD> fixture(bool sky=true,DWORD version=0xffff0200,bool modern=false){
     const char names[]="\0skycolormid\0skycolorlow\0u_bg_color\0";
+    const char newer[]="\0skycolorhigh\0skycolormid\0bk_cloud_color\0cloud_thickness\0moon_pow\0";
     const char terrain[]="\0sky_color\0FogInfo\0texture_sampler\0";
-    size_t bytes=sky?sizeof(names):sizeof(terrain);size_t words=1+(bytes+3)/4;
+    size_t bytes=sky?(modern?sizeof(newer):sizeof(names)):sizeof(terrain);size_t words=1+(bytes+3)/4;
     std::vector<DWORD> code(3+words,0);code[0]=version;code[1]=0xfffe|((DWORD)words<<16);code[2]=0x42415443;
-    memcpy(code.data()+3,sky?names:terrain,bytes);code.back()=0xffff;return code;
+    memcpy(code.data()+3,sky?(modern?newer:names):terrain,bytes);code.back()=0xffff;return code;
 }
 int main(){
     reentryTLS=TlsAlloc();shaderTable.Release=shaderRelease;shaderTable.GetFunction=shaderRead;
@@ -39,9 +40,9 @@ int main(){
     IDirect3DDevice9 real={&deviceTable};DeviceContext c={};c.real=&real;c.original=&deviceTable;
     c.config={true,15,32,false,true,true};
     auto wrapper=(IDirect3DDevice9*)&c;
-    for(DWORD version:{0xffff0200u,0xffff0300u}) for(bool black:{false,true}){
+    for(DWORD version:{0xffff0200u,0xffff0300u}) for(bool black:{false,true}) for(bool modern:{false,true}){
         c.config.blackSky=black;
-        original.code=fixture(true,version);IDirect3DPixelShader9* result=nullptr;
+        original.code=fixture(true,version,modern);IDirect3DPixelShader9* result=nullptr;
         assert(SUCCEEDED(createPixelShader(wrapper,original.code.data(),&result)));
         assert(result==(IDirect3DPixelShader9*)&replacement && original.refs==0);
         size_t start=replacement.code.size()-10;
@@ -60,6 +61,12 @@ int main(){
         c.config.enabled=mode!=0;c.config.neutralSky=mode!=1;original.failRead=mode==2;
         before=creates;assert(SUCCEEDED(createPixelShader(wrapper,original.code.data(),&result)));
         assert(creates==before+1 && result==(IDirect3DPixelShader9*)&original);IDirect3DPixelShader9_Release(result);
+    }
+    // Partial/generic names must not turn ordinary materials into sky shaders.
+    for(const char* name:{"skycolormid","skycolorhigh","bk_cloud_color","cloud_thickness"}) {
+        auto partial=fixture(true,0xffff0300u,true);char* bytes=(char*)partial.data();
+        for(size_t i=0;i+strlen(name)<partial.size()*4;++i)if(!memcmp(bytes+i,name,strlen(name))){bytes[i]='X';break;}
+        SkyMetadata metadata={};assert(!findSkyMetadata((const uint32_t*)partial.data(),partial.size(),&metadata));
     }
     SkyMetadata m={};auto malformed=fixture();malformed[1]=0x7ffffffe;
     assert(!findSkyMetadata((const uint32_t*)malformed.data(),malformed.size(),&m));

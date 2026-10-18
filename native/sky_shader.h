@@ -3,8 +3,8 @@
 #include <stddef.h>
 #include <string.h>
 
-// Match only CTAB comments containing the three sky-specific constant names
-// present together in the supplied skyauto/skyauto_low shader sources.
+// Match exact sky-specific combinations from skyauto_low, skyauto and
+// skyauto_new. The newer variant has no skycolorlow or u_bg_color.
 struct SkyMetadata { const uint32_t* comment; size_t words; uint32_t version; };
 static bool hasShaderName(const void* memory,size_t bytes,const char* name) {
     auto p=(const unsigned char*)memory;size_t n=strlen(name)+1;
@@ -21,11 +21,12 @@ static bool findSkyMetadata(const uint32_t* code,size_t words,SkyMetadata* out) 
         if(op==0xffff)return false;
         size_t n=op==0xfffe?((token>>16)&0x7fff):((token>>24)&15);
         if(n>words-i-1)return false;
-        if(op==0xfffe && n>=2 && code[i+1]==0x42415443u &&
-           hasShaderName(code+i+2,(n-1)*4,"skycolormid") &&
-           hasShaderName(code+i+2,(n-1)*4,"skycolorlow") &&
-           hasShaderName(code+i+2,(n-1)*4,"u_bg_color")) {
-            *out={code+i,n+1,code[0]};return true;
+        if(op==0xfffe && n>=2 && code[i+1]==0x42415443u) {
+            auto data=code+i+2;size_t bytes=(n-1)*4;
+            auto has=[&](const char* name){return hasShaderName(data,bytes,name);};
+            bool classic=has("skycolormid") && has("skycolorlow") && has("u_bg_color");
+            bool clouds=has("skycolormid") && has("skycolorhigh") && has("bk_cloud_color") && has("cloud_thickness");
+            if(classic || clouds){*out={code+i,n+1,code[0]};return true;}
         }
         i+=n+1;
     }

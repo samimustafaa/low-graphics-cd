@@ -1,10 +1,10 @@
-# Texture Lab 1.5.0
+# Texture Lab 1.5.1
 
-- Added optional **No grass + flat ground** under Potato Graphics. Recognized grass stops rendering; recognized terrain uses flat muted green. Low, Ultra and sky behavior are preserved.
-- Rebuilt the TL icon from vector shapes with native frames for taskbar, tray, shortcuts and high-DPI screens.
-- Added a persistent, bold **New update - update the app now** banner. Click to reopen its update prompt after dismissing the popup. Checks run at launch and every five minutes while open or in the tray.
-- Applied settings are preserved when updating the game helper.
+- Replaced small sky radio circles with rounded, animated Gray/Black buttons, clear selection styling and mouse/keyboard support.
+- Choosing a color enables the Sky switch. Apply confirms the saved sky color and restart requirement.
+- Fixed a sky-recognition gap: `skyauto_new` lacks two constants required by the old matcher. Gray and Black now support its cloud-bearing sky signature, alongside the original sky variants.
+- Added real D3D9 pixel tests for Gray, Black and original-sky mode across both shader models and sky signatures.
 
-**Enable:** close the game, update Texture Lab, click **Install / update**, choose **Potato Graphics**, enable **No grass + flat ground**, click **Apply preset**, and restart the game. The option is off by default.
+**Required after updating:** close the game, click **Install / update**, choose **Potato Graphics**, pick **Gray** or **Black**, click **Apply preset**, and relaunch the game. Updating the app alone does not replace the older renderer in the game folder.
 
-Only recognized shaders change. Unknown/stripped shaders, water, terrain holes and collision remain original. Some client variants may retain grass or ground detail; test in-game to confirm coverage and performance. FPS increases are not guaranteed. Disable the option, Apply and restart to restore its original shaders.
+Unknown/stripped sky shaders and separate effects may remain unchanged. Existing grass/ground options, texture strengths, icon and updater behavior are preserved.

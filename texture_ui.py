@@ -181,11 +181,14 @@ class App:
         self.profile = tk.IntVar(value=2)
         self.neutral_sky = tk.BooleanVar(value=True)
         self.black_sky = tk.BooleanVar(value=False)
+        self.black_sky.trace_add('write',lambda *args:self.paint_sky())
+        self.neutral_sky.trace_add('write',lambda *args:self.paint_sky())
         self.flat_ground = tk.BooleanVar(value=False)
         self.allow_mipmaps = tk.BooleanVar(value=True)
         self.applied = False
         self.using = tk.StringVar(value="No preset applied yet.")
         self.enabled = tk.BooleanVar(value=True)
+        self.enabled.trace_add('write',lambda *args:self.paint_sky())
         self.passthrough = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value='Choose the game client to get started.')
         self.status.trace_add('write',lambda *args:self.paint_status())
@@ -205,7 +208,7 @@ class App:
         self.route = 'Graphics'
         self.font = 'Segoe UI' if 'Segoe UI' in tkfont.families(root) else 'Helvetica'
         self.wrapped_labels = []
-        root.title('Texture Lab 1.5.0')
+        root.title('Texture Lab 1.5.1')
         scale = float(root.tk.call('tk', 'scaling')) / (96 / 72)
         root.withdraw()
         self.work_area = monitor_work_area(root)
@@ -238,7 +241,7 @@ class App:
         for name in ('Graphics', 'Diagnostics', 'About'):
             self.nav[name] = self.button(self.sidebar, name, lambda n=name: self.show(n), quiet=True)
             self.nav[name].pack(side='left', padx=5, pady=12)
-        self.label(self.sidebar, 'v1.5.0', 9, MUTED).pack(side='right', padx=28)
+        self.label(self.sidebar, 'v1.5.1', 9, MUTED).pack(side='right', padx=28)
         body = tk.Frame(root, bg=BG)
         body.pack(fill='both', expand=True)
         self.update_banner = self.label(body,'New update - update the app now',9,SUCCESS,True,anchor='center',cursor='hand2')
@@ -311,7 +314,7 @@ class App:
             return
         self.update_busy = True
         def worker():
-            try: self.jobs.put(('release', (update_manager.check_for_update('1.5.0'), manual)))
+            try: self.jobs.put(('release', (update_manager.check_for_update('1.5.1'), manual)))
             except Exception as error: self.jobs.put(('update_error', (str(error), manual)))
         threading.Thread(target=worker, daemon=True).start()
 
@@ -448,11 +451,14 @@ class App:
         lower=tk.Frame(quality,bg=CARD);lower.pack(fill='x')
         options=tk.Frame(lower,bg=CARD);options.pack(side='left',fill='x',expand=True)
         skyrow=self.option(options,'Sky · Potato Graphics',self.neutral_sky)
+        self.sky_buttons={}
         for name, value in [('Gray',False),('Black',True)]:
-            tk.Radiobutton(skyrow,text=name,variable=self.black_sky,value=value,
-                           bg=CARD,fg=TEXT,selectcolor=CARD,activebackground=CARD,
-                           activeforeground=ACCENT,font=(self.font,9),highlightthickness=0,
-                           bd=0,cursor='hand2').pack(side='left',padx=4)
+            button=MotionButton(skyrow,name,lambda black=value:self.choose_sky(black),
+                                (self.font,9,'bold'),fill=BG,padx=12,pady=4)
+            button.configure(width=button.face.measure('✓ Black')+24)
+            button.pack(side='left',padx=3)
+            self.sky_buttons[value]=button
+        self.paint_sky()
         self.option(options,'Stronger close-up textures + sky mipmaps · Potato',self.allow_mipmaps)
         self.option(options,'No grass + flat ground · Potato Graphics',self.flat_ground)
         self.apply_button=self.button(lower,'Apply preset  →',lambda:self.run(self.apply),primary=True)
@@ -472,6 +478,28 @@ class App:
             button.set_palette('#292334' if chosen else '#14161a', ACCENT if chosen else TEXT, border=ACCENT if chosen else LINE)
         desc = next((d for v, n, d in PROFILES if v == mode), 'Choose a preset.')
         self.profile_description.set(desc)
+        self.paint_sky()
+
+    def paint_sky(self):
+        if getattr(self,'route',None)!='Graphics': return
+        for black,button in getattr(self,'sky_buttons',{}).items():
+            if not button.winfo_exists(): continue
+            active=self.profile.get()==6 and self.neutral_sky.get() and self.enabled.get()
+            selected=active and self.black_sky.get()==black
+            button.text=('✓ ' if selected else '')+('Black' if black else 'Gray')
+            button.set_palette('#30283f' if selected else '#15171b',ACCENT if selected else MUTED,
+                               hover='#3a304b' if selected else '#25282e',border=ACCENT if selected else LINE)
+
+    def choose_sky(self, black):
+        if self.profile.get()!=6:
+            self.status.set('Sky colors require Potato Graphics. Choose that preset, then Apply.')
+            return
+        if not self.enabled.get():
+            self.status.set('Turn Texture changes on to use a sky color, then Apply.')
+            return
+        self.black_sky.set(black)
+        self.neutral_sky.set(True)
+        self.status.set(('Black' if black else 'Gray')+' sky selected. Click Apply preset with the game closed, then relaunch.')
 
     def choose_profile(self, mode):
         if mode == 6:
@@ -505,7 +533,7 @@ class App:
         self.label(self.content, size=9, color=MUTED, textvariable=self.status, wraplength=740).pack(anchor='w', pady=(12, 0))
 
     def about(self):
-        self.heading('DESKTOP EDITION / 1.5.0', 'About Texture Lab',
+        self.heading('DESKTOP EDITION / 1.5.1', 'About Texture Lab',
                      'Updates check GitHub on opening and every five minutes. You choose when to install.')
         frame = self.card(self.content); frame.pack(fill='x')
         text = ('Texture Lab lowers texture detail through four presets. Close the game before applying, then launch it normally.\n\n'
@@ -571,7 +599,7 @@ class App:
         if core.sha(data) != expected: raise ValueError('The bundled DLL differs from its recorded hash. Extract a fresh package.')
         result = core.install_or_update(exe.parent, data)
         self.load_selected()
-        self.status.set(f'Helper {result} to 1.5.0. Restart the game and test Low first. Native loading and texture changes still need an in-game check.')
+        self.status.set(f'Helper {result} to 1.5.1. Restart the game and test Low first. Native loading and texture changes still need an in-game check.')
 
     def remove(self):
         exe = self.game(); core.require_closed(exe); core.uninstall(exe.parent)
@@ -586,7 +614,8 @@ class App:
         core.save_preset(exe.parent, self.profile.get(), self.enabled.get(), neutral_sky=self.neutral_sky.get(), allow_mipmaps=self.allow_mipmaps.get(), collect_stats=self.collect_stats.get(), black_sky=self.black_sky.get(), flat_ground=self.flat_ground.get())
         self.saved_label(self.profile.get(), self.enabled.get())
         self.passthrough.set(False)
-        self.status.set('Graphics applied. ' + self.using.get() + '.')
+        sky=('Black' if self.black_sky.get() else 'Gray') if self.enabled.get() and self.profile.get()==6 and self.neutral_sky.get() else 'Original'
+        self.status.set('Graphics applied. ' + self.using.get() + '. Sky: '+sky+' · restart the game.')
         if self.route=='Graphics': self.status_label.configure(fg=SUCCESS)
 
     def save_passthrough(self):
