@@ -4,7 +4,7 @@ A minimal Windows graphics control app for the 32-bit Direct3D 9 version of Crea
 
 ## Install
 
-Download **TextureLab-Setup-1.2.0.exe** from [Releases](https://github.com/samimustafaa/low-graphics-cd/releases). Install and open it. Python is included; no terminal commands are needed. The standalone `TextureLab-1.2.0.exe` is an alternative if you prefer no installation.
+Download **TextureLab-Setup-1.2.1.exe** from [Releases](https://github.com/samimustafaa/low-graphics-cd/releases). Install and open it. Python is included; no terminal commands are needed. The standalone `TextureLab-1.2.1.exe` is an alternative if you prefer no installation.
 
 1. Close the game completely.
 2. Browse to your actual `client.exe`.
@@ -66,3 +66,7 @@ Install 1.2.0 once to receive the updater; older releases cannot update themselv
 Downloads use HTTPS, repository/version/filename checks, a 64 MiB bound, exact size and SHA-256 verification from the release's checksum file. This is integrity verification against the GitHub release, not independent publisher authentication. Installed copies use the per-user installer and reopen after an update. Portable copies use a separate bundled helper that waits for the app to exit, verifies the staged executable, retains `.previous`, swaps and relaunches; failed swaps/launches attempt restoration. Protected/read-only portable folders may require moving the app to a writable folder or using the installer. Updating the control app does not replace an already installed game-directory graphics helper: close the game and click **Install / update** to install the new bundled renderer, then Apply.
 
 X hides the window when Windows accepts its tray icon. Right-click it for Open, Check for updates or Exit. If no tray icon can be created, X exits so the app cannot become inaccessible. No Windows startup entry is added. A second launch activates the existing instance. The tray thread waits for native messages, hidden UI polling slows to once per second, and hover animations run only during interaction. No extra tray/update Python dependencies are required.
+
+## 1.2.1 interface update
+
+The control app now uses a compact two-column black layout, smaller type, rounded dark buttons with hover/press fades and keyboard focus, custom dark switches, and a dark Windows title bar where supported. Page scrolling and the light native scrollbar are removed; the preset, Apply button and status fit together in the main window. The game-directory renderer remains version 1.2.0: this release changes the interface only. Existing 1.2.0 app users can install it from **About → Check for updates** or accept the opening update popup.

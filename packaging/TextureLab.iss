@@ -1,4 +1,4 @@
-#define AppVersion "1.2.0"
+#define AppVersion "1.2.1"
 [Setup]
 AppId={{5AF53953-9946-4A0A-BD65-2ED4641369B1}
 AppName=Texture Lab
@@ -29,7 +29,7 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 [Run]
 Filename: "{app}\TextureLab.exe"; Description: "Open Texture Lab"; Flags: nowait postinstall skipifsilent
 
-Filename: "{app}\TextureLab.exe"; Flags: nowait runhidden; Check: IsUpdateInstall
+Filename: "{app}\TextureLab.exe"; Flags: nowait; Check: IsUpdateInstall
 [Code]
 function IsUpdateInstall: Boolean;
 begin

@@ -47,7 +47,7 @@ class UITests(unittest.TestCase):
                 self.assertFalse(core.read_settings(exe.parent)['bypass'])
                 app.show('About'); root.update()
                 app.show('Graphics'); root.geometry('960x660'); root.update()
-                self.assertGreaterEqual(app.page_canvas.bbox('all')[3], 0)
+                self.assertLessEqual(app.content.winfo_reqheight(), app.content.winfo_height())
                 with patch.object(core, 'require_closed', side_effect=ValueError('game running')):
                     with self.assertRaisesRegex(ValueError, 'game running'): app.apply()
                 app.remove(); self.assertFalse((exe.parent / core.DLL).exists())
@@ -68,3 +68,22 @@ class UITests(unittest.TestCase):
             app.offer_update(r,False); popup.assert_called_once()
             app.offer_update(r,True); self.assertEqual(popup.call_count,2)
         app.close(); app.tray.stop.assert_called_once()
+
+    def test_compact_pages_fit_and_buttons_support_pointer_and_keyboard(self):
+        try: root = tk.Tk()
+        except tk.TclError: self.skipTest('No display available')
+        app=App(root,remember=False);self.addCleanup(app.close)
+        root.geometry('%dx%d' % root.minsize())
+        for route in ('Graphics','Diagnostics','About','Graphics'):
+            app.show(route);root.update()
+            self.assertLessEqual(app.content.winfo_reqheight(),app.content.winfo_height(),route)
+            self.assertLessEqual(app.content.winfo_reqwidth(),app.content.winfo_width(),route)
+        self.assertTrue(app.apply_button.winfo_ismapped())
+        self.assertLessEqual(app.apply_button.winfo_rooty()+app.apply_button.winfo_height(),root.winfo_rooty()+root.winfo_height())
+        button=app.profile_buttons[6]
+        button.event_generate('<Enter>');button.event_generate('<ButtonPress-1>');button.event_generate('<ButtonRelease-1>')
+        root.update();self.assertEqual(app.profile.get(),6)
+        button=app.profile_buttons[2];button.focus_force();root.update()
+        button.event_generate('<KeyPress-space>');button.event_generate('<KeyRelease-space>')
+        root.update();self.assertEqual(app.profile.get(),2)
+        self.assertFalse(any(isinstance(w,tk.Scrollbar) for w in app.content.master.winfo_children()))
