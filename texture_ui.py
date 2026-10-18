@@ -225,7 +225,7 @@ class App:
         self.route = 'Graphics'
         self.font = 'Segoe UI' if 'Segoe UI' in tkfont.families(root) else 'Helvetica'
         self.wrapped_labels = []
-        root.title('Texture Lab 1.6.1')
+        root.title('Texture Lab 1.6.2')
         scale = float(root.tk.call('tk', 'scaling')) / (96 / 72)
         root.withdraw()
         self.work_area = monitor_work_area(root)
@@ -258,7 +258,7 @@ class App:
         for name in ('Graphics', 'Diagnostics', 'About'):
             self.nav[name] = self.button(self.sidebar, name, lambda n=name: self.show(n), quiet=True)
             self.nav[name].pack(side='left', padx=5, pady=12)
-        self.label(self.sidebar, 'v1.6.1', 9, MUTED).pack(side='right', padx=28)
+        self.label(self.sidebar, 'v1.6.2', 9, MUTED).pack(side='right', padx=28)
         body = tk.Frame(root, bg=BG)
         body.pack(fill='both', expand=True)
         self.update_banner = self.label(body,'New update - update the app now',9,SUCCESS,True,anchor='center',cursor='hand2')
@@ -357,7 +357,7 @@ class App:
             return
         self.update_busy = True
         def worker():
-            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.1'), manual)))
+            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.2'), manual)))
             except Exception as error: self.jobs.put(('update_error', (str(error), manual)))
         threading.Thread(target=worker, daemon=True).start()
 
@@ -583,7 +583,7 @@ class App:
         self.heading('', 'About Texture Lab', 'Lower graphics for Creative Destruction.')
         frame=self.card(self.content);frame.pack(fill='x')
         self.label(frame,'Made for low-end PCs and laptops.',10,TEXT,wraplength=700).pack(anchor='w')
-        self.creator_label=self.label(frame,'Created by Sami Mustafa',12,TEXT,True)
+        self.creator_label=self.label(frame,'Created by sg0hann',12,TEXT,True)
         self.creator_label.pack(anchor='w',pady=(16,10))
         self.youtube_button=YouTubeButton(frame,lambda:webbrowser.open_new_tab(YOUTUBE_URL),(self.font,10,'bold'))
         self.youtube_button.pack(anchor='w')

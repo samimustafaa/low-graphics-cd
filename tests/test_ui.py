@@ -67,7 +67,7 @@ class UITests(unittest.TestCase):
                 app.passthrough.set(False); app.save_passthrough()
                 self.assertFalse(core.read_settings(exe.parent)['bypass'])
                 app.show('About'); root.update()
-                self.assertEqual(app.creator_label.cget('text'),'Created by Sami Mustafa')
+                self.assertEqual(app.creator_label.cget('text'),'Created by sg0hann')
                 self.assertEqual(len(app.youtube_button.find_withtag('youtube_logo')),2)
                 with patch('texture_ui.webbrowser.open_new_tab') as channel:
                     app.youtube_button.invoke()
