@@ -1,7 +1,7 @@
-# sg0hann Boost 1.6.6
+# sg0hann Boost 1.6.7
 
-- Potato Graphics + **Normal (blue)** now uses lighter, flat gray ground when **No grass + flat ground** is on. The original blue sky stays unchanged.
-- **Sky Gray** keeps the darker flat ground. Both ground styles keep grass removal and zero terrain texture reads.
-- The applied message shows **Ground: light flat** or **Ground: dark flat**.
+- **Normal (blue)** now keeps the ground's original material colors instead of applying a fixed light tint. Potato texture reduction and optional grass removal stay active.
+- **Sky Gray** keeps the darker flat-ground style.
+- The applied message now says **Ground: natural flat** for Normal (blue).
 
-**Close the game, update the app, click Install / update once to replace the graphics helper, then Apply preset and relaunch the game.** Existing settings and recovery backups are preserved.
+**Close the game, update the app, click Install / update, then Apply preset and relaunch.** Enable **No grass + flat ground** and **Stronger close-up textures** for the simplified ground. Existing settings and recovery backups are preserved.

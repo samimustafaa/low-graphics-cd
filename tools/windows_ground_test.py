@@ -26,7 +26,7 @@ float4 main(float2 uv:TEXCOORD0):COLOR {return tex2D(sam_other0,uv)+(safe_range_
 ini=Path('CD_TextureLab.ini');assert not ini.exists()
 mode=sys.argv[1] if len(sys.argv)>1 else 'normal'
 assert mode in ('normal','gray')
-ini.write_text(f'[TextureLab]\nEnabled=1\nBias=0\nFlatGround=1\nNeutralSky={int(mode=="gray")}\n',encoding='ascii')
+ini.write_text(f'[TextureLab]\nEnabled=1\nBias=15\nMinTextureSize=32\nForceMipFilter=1\nMinMipLevel=4\nFlatGround=1\nNeutralSky={int(mode=="gray")}\n',encoding='ascii')
 user=c.WinDLL('user32');user.CreateWindowExW.argtypes=[w.DWORD,w.LPCWSTR,w.LPCWSTR,w.DWORD,c.c_int,c.c_int,c.c_int,c.c_int,w.HWND,c.c_void_p,c.c_void_p,c.c_void_p];user.CreateWindowExW.restype=w.HWND;user.DestroyWindow.argtypes=[w.HWND]
 window=user.CreateWindowExW(0,'STATIC','Ground shader test',0x80000000,0,0,64,64,None,None,None,None)
 factory=device=target=None;shaders=[]
@@ -56,21 +56,49 @@ try:
             locked=Locked();check(method(target,13,c.c_long,c.POINTER(Locked),c.c_void_p,w.DWORD)(target,c.byref(locked),None,0x10))
             try:return struct.unpack('<I',c.string_at(locked.bits+32*locked.pitch+32*4,4))[0]&0xffffff
             finally:check(method(target,14,c.c_long)(target))
-        normalVS=create('float4 main(float4 p:POSITION):POSITION {return p;}','vs_2_0');normalPS=create('float4 main():COLOR {return float4(0,1,0,1);}','ps_2_0')
+        normalVS=create('struct O{float4 p:POSITION;float2 uv:TEXCOORD0;};O main(float4 p:POSITION){O o;o.p=p;o.uv=p.xy*.5+.5;return o;}','vs_2_0');normalPS=create('float4 main():COLOR {return float4(0,1,0,1);}','ps_2_0')
         assert draw(normalVS,normalPS)==0x00ff00,'Control triangle must render'
         for model in (2,3):
             grass=create(GRASS,f'vs_{model}_0');data=bytecode(grass)
             assert struct.pack('<6I',0x05000051,0xa00f0000,0,0,0xbf800000,0x3f800000) in data,'Grass replacement missing'
             assert draw(grass,normalPS)==0xaa1122,'Grass pixels should be absent'
             print('PASS: real HLSL grass recognized, replacement accepted and grass pixels absent for vs',model)
+        def terrain_texture(rgb):
+            texture=c.c_void_p()
+            check(method(device,23,c.c_long,w.UINT,w.UINT,w.UINT,w.DWORD,w.UINT,w.UINT,c.POINTER(c.c_void_p),c.c_void_p)(device,256,256,0,0,21,1,c.byref(texture),None))
+            count=method(texture,13,w.DWORD)(texture)
+            for level in range(count):
+                size=max(1,256>>level);locked=Locked()
+                check(method(texture,19,c.c_long,w.UINT,c.POINTER(Locked),c.c_void_p,w.DWORD)(texture,level,c.byref(locked),None,0))
+                try:
+                    for y in range(size):
+                        row=[]
+                        for x in range(size):
+                            # Original detailed levels have checker contrast; low mip
+                            # levels preserve the material's average natural color.
+                            scale=1 if level>=4 else (.5 if (x+y)%2 else 1.5)
+                            r,g,b=[min(255,round(v*scale)) for v in rgb]
+                            row.append(0xff000000|(r<<16)|(g<<8)|b)
+                        c.memmove(locked.bits+y*locked.pitch,struct.pack('<'+'I'*size,*row),size*4)
+                finally:check(method(texture,20,c.c_long,w.UINT)(texture,level))
+            return texture
         for model in (2,3):
             ground=create(GROUND,f'ps_{model}_0');data=bytecode(ground)
-            constants=(0x3e8f5c29,0x3eae147b,0x3e4ccccd) if mode=='gray' else (0x3f3851ec,0x3f3d70a4,0x3f333333)
-            assert struct.pack('<3I',*constants) in data,'Flat ground replacement missing'
-            pixel=draw(normalVS,ground);rgb=((pixel>>16)&255,(pixel>>8)&255,pixel&255)
-            expected=(71,87,51) if mode=='gray' else (184,189,178)
-            assert all(abs(a-b)<=2 for a,b in zip(rgb,expected)),f'Unexpected {mode} ground color {rgb}'
-            print('PASS: real HLSL terrain recognized and',mode,'ground pixels rendered for ps',model)
+            if mode=='gray':
+                assert struct.pack('<3I',0x3e8f5c29,0x3eae147b,0x3e4ccccd) in data,'Dark ground replacement missing'
+            else:
+                assert data==bytes(compile(GROUND,f'ps_{model}_0')),'Normal sky must preserve terrain material shader'
+            for natural in ((102,132,62),(145,111,71)):
+                texture=terrain_texture(natural)
+                try:
+                    check(method(device,65,c.c_long,w.DWORD,c.c_void_p)(device,0,texture))
+                    pixel=draw(normalVS,ground);rgb=((pixel>>16)&255,(pixel>>8)&255,pixel&255)
+                    expected=(71,87,51) if mode=='gray' else natural
+                    assert all(abs(a-b)<=2 for a,b in zip(rgb,expected)),f'Unexpected {mode} terrain: {rgb}, expected {expected}'
+                finally:
+                    check(method(device,65,c.c_long,w.DWORD,c.c_void_p)(device,0,None));release(texture)
+            print('PASS:',mode,'terrain preserves natural green/brown colors with low mip detail' if mode=='normal' else 'terrain retains dark flat palette','for ps',model)
+
 finally:
     for shader in shaders:release(shader)
     release(target);release(device);release(factory)

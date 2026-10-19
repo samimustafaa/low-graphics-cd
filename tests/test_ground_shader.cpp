@@ -65,13 +65,20 @@ int main() {
     for(bool dark:{false,true}) for(DWORD version:{0xffff0200u,0xffff0300u}) {
         c.config.neutralSky=dark;
         originalPixel.code=fixture(version,groundNames,sizeof(groundNames));IDirect3DPixelShader9* result=nullptr;
-        assert(SUCCEEDED(createPixelShader(wrapper,originalPixel.code.data(),&result)) && result==(IDirect3DPixelShader9*)&replacementPixel);
-        size_t start=replacementPixel.code.size()-10;
-        assert(replacementPixel.code[start+2]==(dark?0x3e8f5c29u:0x3f3851ecu));
-        assert(replacementPixel.code[start+3]==(dark?0x3eae147bu:0x3f3d70a4u));
-        assert(replacementPixel.code[start+4]==(dark?0x3e4ccccdu:0x3f333333u));
-        assert(replacementPixel.code[start+5]==0x3f800000u);
-        assert(originalPixel.refs==0);IDirect3DPixelShader9_Release(result);
+        assert(SUCCEEDED(createPixelShader(wrapper,originalPixel.code.data(),&result)));
+        if(dark) {
+            assert(result==(IDirect3DPixelShader9*)&replacementPixel);
+            size_t start=replacementPixel.code.size()-10;
+            assert(replacementPixel.code[start+2]==0x3e8f5c29u);
+            assert(replacementPixel.code[start+3]==0x3eae147bu);
+            assert(replacementPixel.code[start+4]==0x3e4ccccdu);
+            assert(replacementPixel.code[start+5]==0x3f800000u);
+            assert(originalPixel.refs==0);
+        } else {
+            assert(result==(IDirect3DPixelShader9*)&originalPixel && originalPixel.refs==1);
+            assert(originalPixel.code==fixture(version,groundNames,sizeof(groundNames)));
+        }
+        IDirect3DPixelShader9_Release(result);
         reject=true;assert(SUCCEEDED(createPixelShader(wrapper,originalPixel.code.data(),&result)) && result==(IDirect3DPixelShader9*)&originalPixel);IDirect3DPixelShader9_Release(result);reject=false;
     }
     SkyMetadata m={};

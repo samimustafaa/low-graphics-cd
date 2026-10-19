@@ -28,14 +28,11 @@ static GroundShader groundKind(const uint32_t* code,size_t words,SkyMetadata* me
     }
     return GroundShader::None;
 }
-static void makeFlatGround(const SkyMetadata& m,uint32_t* out,bool darkSky) {
+static void makeFlatGround(const SkyMetadata& m,uint32_t* out) {
     makeGraySky(m,out);
-    // Both palettes are opaque and texture-free. Normal sky uses light gray;
-    // the original dark green is reserved for the reduced gray/legacy black sky.
+    // Gray sky only: preserve the optional dark, texture-free terrain style.
     auto body=out+1+m.words;
-    body[2]=darkSky?0x3e8f5c29u:0x3f3851ecu;
-    body[3]=darkSky?0x3eae147bu:0x3f3d70a4u;
-    body[4]=darkSky?0x3e4ccccdu:0x3f333333u;
+    body[2]=0x3e8f5c29u;body[3]=0x3eae147bu;body[4]=0x3e4ccccdu;
 }
 // Retain CTAB and declarations; collapse grass vertices to a single clipped
 // position. A bounded full parse is required before writing any replacement.

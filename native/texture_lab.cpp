@@ -1,4 +1,4 @@
-// Texture Lab 1.6.6. Public COM forwarding wrappers. System objects, private
+// Texture Lab 1.6.7. Public COM forwarding wrappers. System objects, private
 // runtime layouts and runtime vtables are never modified. Original MIT source.
 #define CINTERFACE
 #define COBJMACROS
@@ -47,7 +47,7 @@ static BOOL CALLBACK initialize(PINIT_ONCE, PVOID, PVOID*) {
     HMODULE pinned;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,
                       (LPCWSTR)selfModule,&pinned);
-    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.6.6 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
+    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.6.7 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
     logLine(line); return TRUE;
 }
 static FARPROC resolve(const char* name) {
@@ -139,7 +139,9 @@ static HRESULT STDMETHODCALLTYPE queryFactory(IDirect3D9* d,REFIID iid,void** ou
 static HRESULT STDMETHODCALLTYPE createPixelShader(IDirect3DDevice9* d,const DWORD* code,IDirect3DPixelShader9** out) {
     auto c=ctx(d); Hold<DeviceContext> hold(c); CallGuard entry;
     HRESULT hr=c->original->CreatePixelShader(c->real,code,out);
-    if(!entry.outer || FAILED(hr) || !out || !*out || !c->config.enabled || (!c->config.neutralSky && !c->config.flatGround) || c->config.bypass)return hr;
+    if(!entry.outer || FAILED(hr) || !out || !*out || !c->config.enabled || !c->config.neutralSky || c->config.bypass)return hr;
+    // Normal blue sky keeps the terrain material/shading and its own colors.
+    // Potato sampler reduction still removes fine detail; grass is handled by VS.
     ++c->shaderChecks;
     UINT bytes=0;
     if(FAILED(IDirect3DPixelShader9_GetFunction(*out,nullptr,&bytes)) || bytes<8 || bytes>1024*1024 || bytes%4)return hr;
@@ -153,11 +155,11 @@ static HRESULT STDMETHODCALLTYPE createPixelShader(IDirect3DDevice9* d,const DWO
         size_t words=graySkyWordCount(match);
         auto gray=(DWORD*)HeapAlloc(GetProcessHeap(),0,words*4);
         if(gray) {
-            if(terrain)makeFlatGround(match,(uint32_t*)gray,c->config.neutralSky);else makeGraySky(match,(uint32_t*)gray,c->config.blackSky);IDirect3DPixelShader9* replacement=nullptr;
+            if(terrain)makeFlatGround(match,(uint32_t*)gray);else makeGraySky(match,(uint32_t*)gray,c->config.blackSky);IDirect3DPixelShader9* replacement=nullptr;
             HRESULT replacementHR=c->original->CreatePixelShader(c->real,gray,&replacement);
             if(SUCCEEDED(replacementHR) && replacement) {
                 IDirect3DPixelShader9_Release(*out);*out=replacement;if(terrain)++c->flatGrounds;else ++c->graySkies;
-                logLine(terrain?(c->config.neutralSky?"Dark flat ground shader created for Gray sky; terrain metadata matched.":"Light flat ground shader created for Normal sky; terrain metadata matched."):c->config.blackSky?"Black sky shader created; sky metadata matched.":"Neutral gray sky shader created; sky metadata matched.");
+                logLine(terrain?"Dark flat ground shader created for Gray sky; terrain metadata matched.":c->config.blackSky?"Black sky shader created; sky metadata matched.":"Neutral gray sky shader created; sky metadata matched.");
             } else logLine("Solid shader rejected; original shader retained.");
             HeapFree(GetProcessHeap(),0,gray);
         }

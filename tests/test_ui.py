@@ -18,7 +18,7 @@ class UITests(unittest.TestCase):
         except tk.TclError: self.skipTest('No display available')
         app = App(root, remember=False)
         self.addCleanup(app.close)
-        self.assertEqual(root.title(), "sg0hann Boost 1.6.6")
+        self.assertEqual(root.title(), "sg0hann Boost 1.6.7")
         with tempfile.TemporaryDirectory() as temp:
             exe = Path(temp) / 'client.exe'
             data = bytearray(160); data[:2] = b'MZ'
@@ -27,7 +27,7 @@ class UITests(unittest.TestCase):
             exe.write_bytes(data)
             app.path.set(str(exe)); app.load_selected()
             with patch.object(core, 'require_closed', lambda value: None):
-                app.install(); self.assertIn('1.6.6', app.install_status.get())
+                app.install(); self.assertIn('1.6.7', app.install_status.get())
                 app.select(4); app.apply(); self.assertEqual(core.read_settings(exe.parent)['bias'], 10)
                 app.load_selected(); self.assertEqual(app.profile.get(), 4)
                 app.choose_profile(6); app.flat_ground.set(True); app.apply(); self.assertEqual(core.read_settings(exe.parent)['bias'], 15)
@@ -48,7 +48,7 @@ class UITests(unittest.TestCase):
                 self.assertTrue(app.neutral_sky.get());self.assertEqual(gray.text,'✓ Sky Gray')
                 app.apply();self.assertIn('Sky: Gray',app.status.get());self.assertIn('Ground: dark flat',app.status.get())
                 self.assertFalse(core.read_settings(exe.parent)['black_sky'])
-                app.choose_sky('normal');app.apply();self.assertIn('Ground: light flat',app.status.get());app.load_selected()
+                app.choose_sky('normal');app.apply();self.assertIn('Ground: natural flat',app.status.get());app.load_selected()
                 self.assertFalse(app.neutral_sky.get())
                 self.assertEqual(app.sky_buttons['normal'].text,'✓ Normal (blue)')
                 app.choose_profile(6);self.assertFalse(app.neutral_sky.get())
@@ -90,7 +90,7 @@ class UITests(unittest.TestCase):
         app.reveal(); self.assertFalse(app.hidden); root.update()
         with patch('texture_ui.messagebox.askyesno',return_value=False) as popup:
             from update_manager import Release
-            r=Release('1.6.6','file','',1,'','')
+            r=Release('1.6.7','file','',1,'','')
             app.offer_update(r,False); popup.assert_called_once()
             root.update()
             self.assertTrue(app.update_banner.winfo_ismapped())
