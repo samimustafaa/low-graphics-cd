@@ -1,4 +1,4 @@
-#define AppVersion "1.6.4"
+#define AppVersion "1.6.5"
 [Setup]
 AppId={{5AF53953-9946-4A0A-BD65-2ED4641369B1}
 AppName=sg0hann Boost
@@ -21,12 +21,13 @@ CloseApplications=yes
 [Files]
 Source: "..\dist\TextureLab.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "TextureLab-installed.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\app.ico"; DestDir: "{app}"; DestName: "sg0hann-boost.ico"; Flags: ignoreversion
 [InstallDelete]
 Type: files; Name: "{userprograms}\Texture Lab\Texture Lab.lnk"
 Type: files; Name: "{autodesktop}\Texture Lab.lnk"
 [Icons]
-Name: "{group}\sg0hann Boost"; Filename: "{app}\TextureLab.exe"
-Name: "{autodesktop}\sg0hann Boost"; Filename: "{app}\TextureLab.exe"; Tasks: desktopicon
+Name: "{group}\sg0hann Boost"; Filename: "{app}\TextureLab.exe"; IconFilename: "{app}\sg0hann-boost.ico"; AppUserModelID: "sg0hann.TextureLab"
+Name: "{autodesktop}\sg0hann Boost"; Filename: "{app}\TextureLab.exe"; Tasks: desktopicon; IconFilename: "{app}\sg0hann-boost.ico"; AppUserModelID: "sg0hann.TextureLab"
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 [Run]

@@ -13,7 +13,7 @@ user.GetWindowThreadProcessId.argtypes=[w.HWND,c.POINTER(w.DWORD)]
 kernel.OpenProcess.argtypes=[w.DWORD,w.BOOL,w.DWORD];kernel.OpenProcess.restype=w.HANDLE
 kernel.WaitForSingleObject.argtypes=[w.HANDLE,w.DWORD];kernel.WaitForSingleObject.restype=w.DWORD
 kernel.CloseHandle.argtypes=[w.HANDLE]
-installer=Path('release/TextureLab-Setup-1.6.4.exe').resolve()
+installer=Path('release/TextureLab-Setup-1.6.5.exe').resolve()
 # subprocess waits for the installer itself, rather than its relaunched app tree.
 subprocess.run([str(installer),'/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/TEXTURELABUPDATE=1','/DIR='+str(Path(sys.argv[1]).resolve())],check=True,timeout=60)
 def wait_for(predicate):
@@ -23,7 +23,16 @@ def wait_for(predicate):
         if value:return value
         time.sleep(.1)
     raise AssertionError('Packaged lifecycle step timed out')
-window=wait_for(lambda:user.FindWindowW(None,'sg0hann Boost 1.6.4'))
+window=wait_for(lambda:user.FindWindowW(None,'sg0hann Boost 1.6.5'))
+import shell_identity
+properties=wait_for(lambda:shell_identity.read_values(window))
+assert properties[5]==shell_identity.APP_ID,properties
+assert properties[4]=='sg0hann Boost',properties
+assert properties[2]==subprocess.list2cmdline([str(Path(sys.argv[1]).resolve()/'TextureLab.exe')]),properties
+icon=Path(properties[3].removesuffix(',0'))
+assert icon.is_file() and '_MEI' not in str(icon),properties
+assert icon.read_bytes()==Path('app.ico').read_bytes(),'Pinned icon differs from Lightning S artwork'
+print('PASS: actual packaged window supplies branded pin name, persistent Lightning S icon and correct relaunch target')
 from window_icons import icon_dimensions
 user.GetSystemMetrics.argtypes=[c.c_int];user.GetSystemMetrics.restype=c.c_int
 wait_for(lambda:icon_dimensions(window,1)==(user.GetSystemMetrics(11),)*2)

@@ -1,11 +1,11 @@
 $ErrorActionPreference = 'Stop'
 python -m pip install -r requirements-build.txt
 if ($LASTEXITCODE) { throw 'Build dependencies failed' }
-python -m PyInstaller --noconfirm --clean --onefile --windowed --noupx --name TextureLab --icon app.ico --add-data 'd3d9.dll:.' --add-data 'DLL_SHA256.txt:.' --add-data 'app.ico:.' --add-data 'app-mark.png:.' --add-data 'icons:icons' --add-binary 'TextureLab-Updater.exe:.' texture_lab.pyw
+python -m PyInstaller --noconfirm --clean --onefile --windowed --noupx --name TextureLab --icon app.ico --version-file packaging/version_info.txt --add-data 'd3d9.dll:.' --add-data 'DLL_SHA256.txt:.' --add-data 'app.ico:.' --add-data 'app-mark.png:.' --add-data 'icons:icons' --add-binary 'TextureLab-Updater.exe:.' texture_lab.pyw
 if ($LASTEXITCODE) { throw 'Standalone build failed' }
 $compiler = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
 if (!(Test-Path $compiler)) { throw 'Install Inno Setup 6 before building the installer' }
 & $compiler packaging\TextureLab.iss
 if ($LASTEXITCODE) { throw 'Installer build failed' }
-Copy-Item dist\TextureLab.exe release\TextureLab-1.6.4.exe
+Copy-Item dist\TextureLab.exe release\TextureLab-1.6.5.exe
 Get-ChildItem release\*.exe | ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $_.Name } | Set-Content release\SHA256SUMS.txt

@@ -1,6 +1,9 @@
-# sg0hann Boost 1.6.4
+# sg0hann Boost 1.6.5
 
-- Added the chosen **Lightning S** icon throughout the app, taskbar, tray, shortcuts, and installer.
-- Clean vector artwork with individually rendered Windows icon sizes, including 16, 20, 24, 28, 32, 40, 48, 64, 96, 128, and 256 pixels.
+- Fixed the name and icon Windows uses when pinning the running app.
+- Added explicit taskbar relaunch properties, matching shortcut identity, and branded EXE metadata.
+- Pinned icons now use a persistent icon file, rather than a temporary extraction path.
 
-Settings, automatic updates, and the 1.6.0 graphics helper are unchanged. No helper reinstall is needed.
+After updating, **unpin the old TextureLab shortcut once, open sg0hann Boost, then pin it again**. Windows keeps old pinned shortcuts and their cached icons.
+
+Graphics settings and the 1.6.0 game helper are unchanged.

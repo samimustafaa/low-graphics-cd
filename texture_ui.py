@@ -8,6 +8,7 @@ import sys
 import webbrowser
 import update_manager
 import tray_icon
+import shell_identity
 import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import filedialog, messagebox
@@ -225,7 +226,7 @@ class App:
         self.route = 'Graphics'
         self.font = 'Segoe UI' if 'Segoe UI' in tkfont.families(root) else 'Helvetica'
         self.wrapped_labels = []
-        root.title('sg0hann Boost 1.6.4')
+        root.title('sg0hann Boost 1.6.5')
         scale = float(root.tk.call('tk', 'scaling')) / (96 / 72)
         root.withdraw()
         self.work_area = monitor_work_area(root)
@@ -261,7 +262,7 @@ class App:
         for name in ('Graphics', 'Diagnostics', 'About'):
             self.nav[name] = self.button(self.sidebar, name, lambda n=name: self.show(n), quiet=True)
             self.nav[name].pack(side='left', padx=5, pady=12)
-        self.label(self.sidebar, 'v1.6.4', 9, MUTED).pack(side='right', padx=28)
+        self.label(self.sidebar, 'v1.6.5', 9, MUTED).pack(side='right', padx=28)
         body = tk.Frame(root, bg=BG)
         body.pack(fill='both', expand=True)
         self.update_banner = self.label(body,'New update - update the app now',9,SUCCESS,True,anchor='center',cursor='hand2')
@@ -273,6 +274,15 @@ class App:
         self.timer = root.after(250, self.check_jobs)
         root.protocol('WM_DELETE_WINDOW', self.hide)
         self.center_window()
+        self.shell_window = None
+        self.shell_error = None
+        if os.name == 'nt':
+            import ctypes as c
+            user = c.WinDLL('user32')
+            user.GetParent.argtypes = [c.c_void_p];user.GetParent.restype = c.c_void_p
+            self.shell_window = user.GetParent(root.winfo_id())
+            try: shell_identity.configure(self.shell_window, core.ROOT / 'app.ico')
+            except (OSError, AttributeError) as error: self.shell_error = str(error)
         root.deiconify()
         self.icon_timer=self.root.after(0, self.set_windows_icons)
 
@@ -342,6 +352,9 @@ class App:
             if getattr(self,name,None):self.root.after_cancel(getattr(self,name))
         if self.update_timer: self.root.after_cancel(self.update_timer)
         if self.tray: self.tray.stop()
+        if self.shell_window:
+            try: shell_identity.clear(self.shell_window)
+            except OSError: pass
         self.root.destroy()
         if self.native_icons:
             import ctypes as c
@@ -360,7 +373,7 @@ class App:
             return
         self.update_busy = True
         def worker():
-            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.4'), manual)))
+            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.5'), manual)))
             except Exception as error: self.jobs.put(('update_error', (str(error), manual)))
         threading.Thread(target=worker, daemon=True).start()
 
@@ -727,7 +740,7 @@ def main():
     # DPI awareness affects this GUI process only, not the game.
     import ctypes
     try:
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('sg0hann.TextureLab')
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(shell_identity.APP_ID)
         ctypes.windll.shcore.SetProcessDpiAwareness(1)
     except (OSError, AttributeError): pass
     smoke_mode = len(sys.argv) == 3 and sys.argv[1] == '--smoke-test'
@@ -753,6 +766,13 @@ def main():
         # CI verifies the frozen payload and creates/tears down the actual GUI.
         def smoke():
             import tempfile
+            assert not app.shell_error, app.shell_error
+            pin = shell_identity.read_values(app.shell_window)
+            assert pin[4] == shell_identity.DISPLAY_NAME and pin[5] == shell_identity.APP_ID, pin
+            assert pin[2] == shell_identity.relaunch_command(), pin
+            pin_icon = Path(pin[3].removesuffix(',0'))
+            assert pin_icon.is_file() and '_MEI' not in str(pin_icon), pin
+            assert pin_icon.read_bytes() == (core.ROOT / 'app.ico').read_bytes()
             data = (core.ROOT / core.DLL).read_bytes()
             assert core.sha(data) == (core.ROOT / 'DLL_SHA256.txt').read_text().split()[0]
             assert (core.ROOT / 'TextureLab-Updater.exe').read_bytes()[:2] == b'MZ'

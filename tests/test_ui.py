@@ -18,7 +18,7 @@ class UITests(unittest.TestCase):
         except tk.TclError: self.skipTest('No display available')
         app = App(root, remember=False)
         self.addCleanup(app.close)
-        self.assertEqual(root.title(), "sg0hann Boost 1.6.4")
+        self.assertEqual(root.title(), "sg0hann Boost 1.6.5")
         with tempfile.TemporaryDirectory() as temp:
             exe = Path(temp) / 'client.exe'
             data = bytearray(160); data[:2] = b'MZ'
