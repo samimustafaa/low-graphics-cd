@@ -225,7 +225,7 @@ class App:
         self.route = 'Graphics'
         self.font = 'Segoe UI' if 'Segoe UI' in tkfont.families(root) else 'Helvetica'
         self.wrapped_labels = []
-        root.title('sg0hann Boost 1.6.3')
+        root.title('sg0hann Boost 1.6.4')
         scale = float(root.tk.call('tk', 'scaling')) / (96 / 72)
         root.withdraw()
         self.work_area = monitor_work_area(root)
@@ -261,7 +261,7 @@ class App:
         for name in ('Graphics', 'Diagnostics', 'About'):
             self.nav[name] = self.button(self.sidebar, name, lambda n=name: self.show(n), quiet=True)
             self.nav[name].pack(side='left', padx=5, pady=12)
-        self.label(self.sidebar, 'v1.6.3', 9, MUTED).pack(side='right', padx=28)
+        self.label(self.sidebar, 'v1.6.4', 9, MUTED).pack(side='right', padx=28)
         body = tk.Frame(root, bg=BG)
         body.pack(fill='both', expand=True)
         self.update_banner = self.label(body,'New update - update the app now',9,SUCCESS,True,anchor='center',cursor='hand2')
@@ -360,7 +360,7 @@ class App:
             return
         self.update_busy = True
         def worker():
-            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.3'), manual)))
+            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.4'), manual)))
             except Exception as error: self.jobs.put(('update_error', (str(error), manual)))
         threading.Thread(target=worker, daemon=True).start()
 

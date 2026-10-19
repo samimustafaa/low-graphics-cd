@@ -1,9 +1,6 @@
-# sg0hann Boost 1.6.3
+# sg0hann Boost 1.6.4
 
-Texture Lab is now **sg0hann Boost**.
+- Added the chosen **Lightning S** icon throughout the app, taskbar, tray, shortcuts, and installer.
+- Clean vector artwork with individually rendered Windows icon sizes, including 16, 20, 24, 28, 32, 40, 48, 64, 96, 128, and 256 pixels.
 
-- New name in the app, installer, shortcuts, tray, and update messages.
-- Added **Creative Destruction Graphics Tool** underneath the name.
-- Existing settings, backups, and automatic updates keep working.
-
-Graphics settings and the 1.6.0 game helper are unchanged. No helper reinstall is needed.
+Settings, automatic updates, and the 1.6.0 graphics helper are unchanged. No helper reinstall is needed.
