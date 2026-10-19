@@ -14,7 +14,8 @@ if (!(Test-Path "$target\TextureLab-installed.txt")) { throw 'Installed update m
 $link = Join-Path ([Environment]::GetFolderPath('Programs')) 'sg0hann Boost\sg0hann Boost.lnk'
 if (!(Test-Path $link)) { throw 'Branded Start menu shortcut missing' }
 $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($link)
-if ($shortcut.TargetPath -ne "$target\TextureLab.exe") { throw 'Shortcut launch target is wrong' }
+python -c "import os,sys; assert os.path.samefile(sys.argv[1],sys.argv[2]), sys.argv[1:]" $shortcut.TargetPath "$target\TextureLab.exe"
+if ($LASTEXITCODE) { throw "Shortcut launch target is wrong: $($shortcut.TargetPath) vs $target\TextureLab.exe" }
 if ($shortcut.IconLocation -notlike '*sg0hann-boost.ico*') { throw 'Shortcut icon is wrong' }
 $shell = New-Object -ComObject Shell.Application
 $item = $shell.NameSpace((Split-Path $link)).ParseName((Split-Path $link -Leaf))
