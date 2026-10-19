@@ -226,7 +226,7 @@ class App:
         self.route = 'Graphics'
         self.font = 'Segoe UI' if 'Segoe UI' in tkfont.families(root) else 'Helvetica'
         self.wrapped_labels = []
-        root.title('sg0hann Boost 1.6.5')
+        root.title('sg0hann Boost 1.6.6')
         scale = float(root.tk.call('tk', 'scaling')) / (96 / 72)
         root.withdraw()
         self.work_area = monitor_work_area(root)
@@ -262,7 +262,7 @@ class App:
         for name in ('Graphics', 'Diagnostics', 'About'):
             self.nav[name] = self.button(self.sidebar, name, lambda n=name: self.show(n), quiet=True)
             self.nav[name].pack(side='left', padx=5, pady=12)
-        self.label(self.sidebar, 'v1.6.5', 9, MUTED).pack(side='right', padx=28)
+        self.label(self.sidebar, 'v1.6.6', 9, MUTED).pack(side='right', padx=28)
         body = tk.Frame(root, bg=BG)
         body.pack(fill='both', expand=True)
         self.update_banner = self.label(body,'New update - update the app now',9,SUCCESS,True,anchor='center',cursor='hand2')
@@ -373,7 +373,7 @@ class App:
             return
         self.update_busy = True
         def worker():
-            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.5'), manual)))
+            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.6'), manual)))
             except Exception as error: self.jobs.put(('update_error', (str(error), manual)))
         threading.Thread(target=worker, daemon=True).start()
 
@@ -659,7 +659,7 @@ class App:
         if core.sha(data) != expected: raise ValueError('The bundled DLL differs from its recorded hash. Extract a fresh package.')
         result = core.install_or_update(exe.parent, data)
         self.load_selected()
-        self.status.set(f'Helper {result} to 1.6.0. Restart the game and test Low first. Native loading and texture changes still need an in-game check.')
+        self.status.set(f'Helper {result} to 1.6.6. Restart the game and test Low first. Native loading and texture changes still need an in-game check.')
 
     def remove(self):
         exe = self.game(); core.require_closed(exe); core.uninstall(exe.parent)
@@ -675,7 +675,8 @@ class App:
         self.saved_label(self.profile.get(), self.enabled.get())
         self.passthrough.set(False)
         sky='Gray' if self.enabled.get() and self.profile.get()==6 and self.neutral_sky.get() else 'Normal (blue)'
-        self.status.set('Graphics applied. ' + self.using.get() + '. Sky: '+sky+' · restart the game.')
+        ground = (' · Ground: '+('dark flat' if self.neutral_sky.get() else 'light flat')) if self.enabled.get() and self.profile.get()==6 and self.flat_ground.get() else ''
+        self.status.set('Graphics applied. ' + self.using.get() + '. Sky: '+sky+ground+' · restart the game.')
         if self.route=='Graphics': self.status_label.configure(fg=SUCCESS)
 
     def save_passthrough(self):

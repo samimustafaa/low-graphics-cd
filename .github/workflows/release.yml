@@ -69,8 +69,10 @@ jobs:
           if ($LASTEXITCODE) { throw "Runtime/assembler tests failed" }
           python tools/windows_sky_test.py
           if ($LASTEXITCODE) { throw "Gray/Black/Off sky rendering tests failed" }
-          python tools/windows_ground_test.py
-          if ($LASTEXITCODE) { throw "Grass/ground rendering tests failed" }
+          python tools/windows_ground_test.py normal
+          if ($LASTEXITCODE) { throw "Normal sky/light ground rendering tests failed" }
+          python tools/windows_ground_test.py gray
+          if ($LASTEXITCODE) { throw "Gray sky/dark ground rendering tests failed" }
           python tools/windows_texture_test.py
           if ($LASTEXITCODE) { throw "Texture sampler test failed" }
           python tools/windows_services_test.py
@@ -104,5 +106,5 @@ jobs:
       - name: Publish release after all checks pass
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.6.5' }}
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.6.6' }}
         run: gh release create "$RELEASE_TAG" release/* --target "$GITHUB_SHA" --title "sg0hann Boost $RELEASE_TAG" --notes-file RELEASE_NOTES.md

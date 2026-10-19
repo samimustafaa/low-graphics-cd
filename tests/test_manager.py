@@ -113,7 +113,7 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(result, "updated")
         self.assertEqual((self.folder / m.DLL).read_bytes(), b"replacement DLL")
         self.assertEqual(game.read_bytes(), b"game stays original")
-        self.assertEqual(json.loads(manifest.read_text())["build_version"], "1.6.0")
+        self.assertEqual(json.loads(manifest.read_text())["build_version"], "1.6.6")
         self.assertEqual(list(self.folder.glob("TextureLab_recovery_*")), [])
 
     def test_failed_update_rolls_back_dll_settings_and_manifest(self):

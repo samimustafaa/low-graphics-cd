@@ -1,4 +1,4 @@
-#define AppVersion "1.6.5"
+#define AppVersion "1.6.6"
 [Setup]
 AppId={{5AF53953-9946-4A0A-BD65-2ED4641369B1}
 AppName=sg0hann Boost

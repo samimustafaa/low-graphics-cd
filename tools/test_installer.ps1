@@ -7,7 +7,7 @@ Get-Content $smoke
 $result = Get-Content $smoke -Raw | ConvertFrom-Json
 if (!$result.bundle_hash_ok -or !$result.fake_install_apply_restore_ok) { throw "Packaged smoke assertions failed: $(Get-Content $smoke -Raw)" }
 $target = Join-Path $env:TEMP 'TextureLab-install-test'
-$p = Start-Process -FilePath "$PWD\release\TextureLab-Setup-1.6.5.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$target`"" -Wait -PassThru
+$p = Start-Process -FilePath "$PWD\release\TextureLab-Setup-1.6.6.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$target`"" -Wait -PassThru
 if ($p.ExitCode -ne 0 -or !(Test-Path "$target\TextureLab.exe")) { throw 'Silent installer failed' }
 if (!(Test-Path "$target\TextureLab-installed.txt")) { throw 'Installed update marker missing' }
 # Check the shortcut Windows can select when the app is pinned.

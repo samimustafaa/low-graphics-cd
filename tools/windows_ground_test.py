@@ -3,6 +3,7 @@ import ctypes as c
 from ctypes import wintypes as w
 from pathlib import Path
 import struct
+import sys
 from windows_texture_test import Present, method, release, check
 compiler=c.WinDLL('d3dcompiler_47.dll');compile_shader=compiler.D3DCompile
 compile_shader.argtypes=[c.c_void_p,c.c_size_t,c.c_char_p,c.c_void_p,c.c_void_p,c.c_char_p,c.c_char_p,w.UINT,w.UINT,c.POINTER(c.c_void_p),c.POINTER(c.c_void_p)];compile_shader.restype=c.c_long
@@ -23,7 +24,9 @@ float4 main(float4 p:POSITION):POSITION {return mul(p,u_wvp)+float4(WindInfo.x,u
 GROUND='''float4 safe_range_color;float4 char_pos;float4 sky_color;float4 weather_intensity;sampler2D sam_other0:register(s0);
 float4 main(float2 uv:TEXCOORD0):COLOR {return tex2D(sam_other0,uv)+(safe_range_color+char_pos+sky_color+weather_intensity)*0.00001;}'''
 ini=Path('CD_TextureLab.ini');assert not ini.exists()
-ini.write_text('[TextureLab]\nEnabled=1\nBias=0\nFlatGround=1\nNeutralSky=0\n',encoding='ascii')
+mode=sys.argv[1] if len(sys.argv)>1 else 'normal'
+assert mode in ('normal','gray')
+ini.write_text(f'[TextureLab]\nEnabled=1\nBias=0\nFlatGround=1\nNeutralSky={int(mode=="gray")}\n',encoding='ascii')
 user=c.WinDLL('user32');user.CreateWindowExW.argtypes=[w.DWORD,w.LPCWSTR,w.LPCWSTR,w.DWORD,c.c_int,c.c_int,c.c_int,c.c_int,w.HWND,c.c_void_p,c.c_void_p,c.c_void_p];user.CreateWindowExW.restype=w.HWND;user.DestroyWindow.argtypes=[w.HWND]
 window=user.CreateWindowExW(0,'STATIC','Ground shader test',0x80000000,0,0,64,64,None,None,None,None)
 factory=device=target=None;shaders=[]
@@ -62,10 +65,12 @@ try:
             print('PASS: real HLSL grass recognized, replacement accepted and grass pixels absent for vs',model)
         for model in (2,3):
             ground=create(GROUND,f'ps_{model}_0');data=bytecode(ground)
-            assert struct.pack('<3I',0x3e8f5c29,0x3eae147b,0x3e4ccccd) in data,'Flat ground replacement missing'
+            constants=(0x3e8f5c29,0x3eae147b,0x3e4ccccd) if mode=='gray' else (0x3f3851ec,0x3f3d70a4,0x3f333333)
+            assert struct.pack('<3I',*constants) in data,'Flat ground replacement missing'
             pixel=draw(normalVS,ground);rgb=((pixel>>16)&255,(pixel>>8)&255,pixel&255)
-            assert all(abs(a-b)<=2 for a,b in zip(rgb,(71,87,51))),f'Unexpected ground color {rgb}'
-            print('PASS: real HLSL terrain recognized and flat ground pixels rendered for ps',model)
+            expected=(71,87,51) if mode=='gray' else (184,189,178)
+            assert all(abs(a-b)<=2 for a,b in zip(rgb,expected)),f'Unexpected {mode} ground color {rgb}'
+            print('PASS: real HLSL terrain recognized and',mode,'ground pixels rendered for ps',model)
 finally:
     for shader in shaders:release(shader)
     release(target);release(device);release(factory)
