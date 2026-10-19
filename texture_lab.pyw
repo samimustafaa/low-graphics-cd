@@ -16,5 +16,5 @@ except Exception:
     except OSError: pass
     if sys.platform == 'win32':
         import ctypes
-        ctypes.windll.user32.MessageBoxW(None, 'Texture Lab could not start.\n\n' + error[-1800:] + '\n\nDetails: ' + str(output) + '', 'Texture Lab startup error', 0x10)
+        ctypes.windll.user32.MessageBoxW(None, 'sg0hann Boost could not start.\n\n' + error[-1800:] + '\n\nDetails: ' + str(output) + '', 'sg0hann Boost startup error', 0x10)
     else: raise

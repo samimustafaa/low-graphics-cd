@@ -62,7 +62,7 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
     DeleteFileW(stage.c_str());
     if(result){
         if(moved){DeleteFileW(target.c_str());moveRetry(backup,target);}
-        MessageBoxW(nullptr,L"Texture Lab could not finish the update. The previous executable was kept or restored. Open the app again or use the installer from GitHub.",L"Texture Lab update",MB_OK|MB_ICONERROR);
+        MessageBoxW(nullptr,L"sg0hann Boost could not finish the update. The previous executable was kept or restored. Open the app again or use the installer from GitHub.",L"sg0hann Boost update",MB_OK|MB_ICONERROR);
     }
     LocalFree(args);return result;
 }

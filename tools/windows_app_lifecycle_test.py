@@ -13,7 +13,7 @@ user.GetWindowThreadProcessId.argtypes=[w.HWND,c.POINTER(w.DWORD)]
 kernel.OpenProcess.argtypes=[w.DWORD,w.BOOL,w.DWORD];kernel.OpenProcess.restype=w.HANDLE
 kernel.WaitForSingleObject.argtypes=[w.HANDLE,w.DWORD];kernel.WaitForSingleObject.restype=w.DWORD
 kernel.CloseHandle.argtypes=[w.HANDLE]
-installer=Path('release/TextureLab-Setup-1.6.2.exe').resolve()
+installer=Path('release/TextureLab-Setup-1.6.3.exe').resolve()
 # subprocess waits for the installer itself, rather than its relaunched app tree.
 subprocess.run([str(installer),'/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/TEXTURELABUPDATE=1','/DIR='+str(Path(sys.argv[1]).resolve())],check=True,timeout=60)
 def wait_for(predicate):
@@ -23,7 +23,7 @@ def wait_for(predicate):
         if value:return value
         time.sleep(.1)
     raise AssertionError('Packaged lifecycle step timed out')
-window=wait_for(lambda:user.FindWindowW(None,'Texture Lab 1.6.2'))
+window=wait_for(lambda:user.FindWindowW(None,'sg0hann Boost 1.6.3'))
 from window_icons import icon_dimensions
 user.GetSystemMetrics.argtypes=[c.c_int];user.GetSystemMetrics.restype=c.c_int
 wait_for(lambda:icon_dimensions(window,1)==(user.GetSystemMetrics(11),)*2)

@@ -1,4 +1,4 @@
-# Texture Lab
+# sg0hann Boost
 
 Lower graphics for Creative Destruction, made for low-end PCs and laptops.
 
@@ -20,7 +20,7 @@ Lower graphics for Creative Destruction, made for low-end PCs and laptops.
 
 **Close the game before changing settings.** After an app update, click **Install / update** again to update the game helper too.
 
-To undo the changes, close the game and click **Restore original** before uninstalling Texture Lab. Right-click the tray icon and choose **Exit** to fully close the app.
+To undo the changes, close the game and click **Restore original** before uninstalling sg0hann Boost. Right-click the tray icon and choose **Exit** to fully close the app.
 
 ## A few things to know
 

@@ -71,7 +71,7 @@ class TrayIcon:
                 elif lp in (0x205,0x7b):
                     menu=user.CreatePopupMenu()
                     try:
-                        user.AppendMenuW(menu,0,100,'Open Texture Lab')
+                        user.AppendMenuW(menu,0,100,'Open sg0hann Boost')
                         user.AppendMenuW(menu,0,101,'Check for updates')
                         user.AppendMenuW(menu,0x800,0,None)
                         user.AppendMenuW(menu,0,102,'Exit')
@@ -97,7 +97,7 @@ class TrayIcon:
             if not icon:raise OSError(c.get_last_error(),'Cannot load tray icon')
             self.data=NOTIFYICONDATA();self.data.size=c.sizeof(self.data);self.data.window=self.window
             self.data.id=1;self.data.flags=1|2|4;self.data.message=WM_ACTION;self.data.icon=icon
-            self.data.tip='Texture Lab — right-click for Open, updates or Exit'
+            self.data.tip='sg0hann Boost — right-click for Open, updates or Exit'
             add_icon();self.ready.set()
             message=w.MSG()
             while user.GetMessageW(c.byref(message),None,0,0)>0:
