@@ -25,7 +25,10 @@ def wait_for(predicate):
     raise AssertionError('Packaged lifecycle step timed out')
 window=wait_for(lambda:user.FindWindowW(None,'sg0hann Boost 1.6.5'))
 import shell_identity
-properties=wait_for(lambda:shell_identity.read_values(window))
+def ready_pin_properties():
+    value=shell_identity.read_values(window)
+    return value if value[5]==shell_identity.APP_ID else None
+properties=wait_for(ready_pin_properties)
 assert properties[5]==shell_identity.APP_ID,properties
 assert properties[4]=='sg0hann Boost',properties
 assert properties[2]==subprocess.list2cmdline([str(Path(sys.argv[1]).resolve()/'TextureLab.exe')]),properties
