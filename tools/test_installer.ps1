@@ -13,6 +13,7 @@ Expand-Archive release\sg0hann-Boost-Portable-1.6.8.zip $zipTarget -Force
 $zipSmoke = Join-Path $env:TEMP 'sg0hann-Boost-zip-smoke.json'
 $p = Start-Process -FilePath "$zipTarget\TextureLab\TextureLab.exe" -ArgumentList '--smoke-test', "`"$zipSmoke`"" -PassThru
 if (!$p.WaitForExit(45000)) { $p.Kill(); throw 'Portable ZIP smoke timed out' }
+Get-Content $zipSmoke
 $result = Get-Content $zipSmoke -Raw | ConvertFrom-Json
 if ($p.ExitCode -ne 0 -or $result.bundle_mode -ne 'onedir' -or !$result.fake_install_apply_restore_ok) { throw 'Portable ZIP smoke failed' }
 $legacySmoke = Join-Path $env:TEMP 'sg0hann-Boost-legacy-smoke.json'

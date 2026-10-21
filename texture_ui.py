@@ -789,7 +789,7 @@ def main():
                 app.show(page);root.update_idletasks()
                 assert app.content.winfo_reqheight() <= app.content.winfo_height(), f'{page} page clips vertically: {app.content.winfo_reqheight()} > {app.content.winfo_height()}'
                 assert app.content.winfo_reqwidth() <= app.content.winfo_width(), f'{page} page clips horizontally: {app.content.winfo_reqwidth()} > {app.content.winfo_width()}'
-            Path(sys.argv[2]).write_text(json.dumps({'title':root.title(), 'standalone':bool(getattr(sys,'frozen',False)), 'bundle_mode':('onedir' if core.ROOT.name=='_internal' and core.ROOT.parent==Path(sys.executable).resolve().parent else 'onefile'), 'profiles':[p[1] for p in PROFILES], 'bundle_hash_ok':True, 'fake_install_apply_restore_ok':True}), encoding='utf-8')
+            Path(sys.argv[2]).write_text(json.dumps({'title':root.title(), 'standalone':bool(getattr(sys,'frozen',False)), 'bundle_mode':('onedir' if core.ROOT.name=='_internal' and core.ROOT.resolve().parent==Path(sys.executable).resolve().parent else 'onefile'), 'profiles':[p[1] for p in PROFILES], 'bundle_hash_ok':True, 'fake_install_apply_restore_ok':True}), encoding='utf-8')
             app.close()
         root.after(400, smoke)
     try: root.mainloop()
