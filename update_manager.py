@@ -66,7 +66,8 @@ def parse_release(data, current_version, installed):
     if version_tuple(tag) <= version_tuple(current_version):
         return None
     version = tag.removeprefix('v')
-    filename = f'TextureLab-Setup-{version}.exe' if installed else f'TextureLab-{version}.exe'
+    # Folder/ZIP and legacy bridge users migrate through the same installer.
+    filename = f'TextureLab-Setup-{version}.exe'
     assets = {a['name']: a for a in info.get('assets', [])}
     target, sums = assets.get(filename), assets.get('SHA256SUMS.txt')
     if not target or not sums:
@@ -181,9 +182,11 @@ def start_update(candidate, digest, root, installed=None, executable=None, pid=N
         raise ValueError('The verified update file changed. Installation was cancelled.')
     executable = Path(executable or sys.executable).resolve()
     installed = is_installed(executable) if installed is None else installed
-    if installed:
+    installer = bool(re.fullmatch(r'TextureLab-Setup-\d+\.\d+\.\d+-[0-9a-f]{12}\.exe', candidate.name))
+    if installed or installer:
         args = [str(candidate), '/SILENT', '/SUPPRESSMSGBOXES', '/NORESTART',
-                '/TEXTURELABUPDATE=1', '/DIR=' + str(executable.parent)]
+                '/TEXTURELABUPDATE=1']
+        if installed: args.append('/DIR=' + str(executable.parent))
     else:
         helper = Path(root) / 'TextureLab-Updater.exe'
         if not helper.is_file():

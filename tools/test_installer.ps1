@@ -1,13 +1,31 @@
 $ErrorActionPreference = 'Stop'
 $smoke = Join-Path $env:TEMP 'TextureLab-portable-smoke.json'
-$p = Start-Process -FilePath "$PWD\dist\TextureLab.exe" -ArgumentList '--smoke-test', "`"$smoke`"" -PassThru
+$p = Start-Process -FilePath "$PWD\dist\TextureLab\TextureLab.exe" -ArgumentList '--smoke-test', "`"$smoke`"" -PassThru
 if (!$p.WaitForExit(45000)) { $p.Kill(); throw 'Packaged app did not finish smoke test' }
 if ($p.ExitCode -ne 0 -or !(Test-Path $smoke)) { throw 'Packaged app failed smoke test' }
 Get-Content $smoke
 $result = Get-Content $smoke -Raw | ConvertFrom-Json
 if (!$result.bundle_hash_ok -or !$result.fake_install_apply_restore_ok) { throw "Packaged smoke assertions failed: $(Get-Content $smoke -Raw)" }
+if ($result.bundle_mode -ne 'onedir') { throw 'Main build unexpectedly extracts a temporary runtime' }
+# Verify the portable ZIP, including all its runtime dependencies.
+$zipTarget = Join-Path $env:TEMP 'sg0hann-Boost-zip-test'
+Expand-Archive release\sg0hann-Boost-Portable-1.6.8.zip $zipTarget -Force
+$zipSmoke = Join-Path $env:TEMP 'sg0hann-Boost-zip-smoke.json'
+$p = Start-Process -FilePath "$zipTarget\TextureLab\TextureLab.exe" -ArgumentList '--smoke-test', "`"$zipSmoke`"" -PassThru
+if (!$p.WaitForExit(45000)) { $p.Kill(); throw 'Portable ZIP smoke timed out' }
+$result = Get-Content $zipSmoke -Raw | ConvertFrom-Json
+if ($p.ExitCode -ne 0 -or $result.bundle_mode -ne 'onedir' -or !$result.fake_install_apply_restore_ok) { throw 'Portable ZIP smoke failed' }
+$legacySmoke = Join-Path $env:TEMP 'sg0hann-Boost-legacy-smoke.json'
+$p = Start-Process -FilePath "$PWD\dist\legacy\TextureLab.exe" -ArgumentList '--smoke-test', "`"$legacySmoke`"" -PassThru
+if (!$p.WaitForExit(45000)) { $p.Kill(); throw 'Legacy update bridge smoke timed out' }
+$result = Get-Content $legacySmoke -Raw | ConvertFrom-Json
+if ($p.ExitCode -ne 0 -or !$result.fake_install_apply_restore_ok) { throw 'Legacy update bridge smoke failed' }
 $target = Join-Path $env:TEMP 'TextureLab-install-test'
-$p = Start-Process -FilePath "$PWD\release\TextureLab-Setup-1.6.7.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$target`"" -Wait -PassThru
+# Simulate replacing an existing one-file installation with the folder runtime.
+New-Item -ItemType Directory -Force $target | Out-Null
+Copy-Item dist\legacy\TextureLab.exe "$target\TextureLab.exe" -Force
+Copy-Item packaging\TextureLab-installed.txt $target -Force
+$p = Start-Process -FilePath "$PWD\release\TextureLab-Setup-1.6.8.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$target`"" -Wait -PassThru
 if ($p.ExitCode -ne 0 -or !(Test-Path "$target\TextureLab.exe")) { throw 'Silent installer failed' }
 if (!(Test-Path "$target\TextureLab-installed.txt")) { throw 'Installed update marker missing' }
 # Check the shortcut Windows can select when the app is pinned.
@@ -30,6 +48,8 @@ if ($p.ExitCode -ne 0 -or !(Test-Path $installed)) { throw 'Installed app failed
 Get-Content $installed
 $result = Get-Content $installed -Raw | ConvertFrom-Json
 if (!$result.bundle_hash_ok -or !$result.fake_install_apply_restore_ok) { throw "Installed smoke assertions failed: $(Get-Content $installed -Raw)" }
+if ($result.bundle_mode -ne 'onedir' -or !(Test-Path "$target\_internal\python312.dll")) { throw 'Installed runtime is not persistent' }
+Write-Host 'PASS: portable ZIP and one-file to folder installation migration use persistent Python runtimes'
 python tools/windows_app_lifecycle_test.py "$target"
 if ($LASTEXITCODE) { throw 'Installed update/relaunch and background lifecycle test failed' }
 $p = Start-Process -FilePath "$target\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru

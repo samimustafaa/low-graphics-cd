@@ -87,6 +87,10 @@ jobs:
       - name: Test packaged app and installer
         shell: pwsh
         run: ./tools/test_installer.ps1
+      - name: Scan packaged release with Microsoft Defender when available
+        shell: pwsh
+        timeout-minutes: 10
+        run: ./tools/scan_release.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: TextureLab-Windows
@@ -106,5 +110,5 @@ jobs:
       - name: Publish release after all checks pass
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.6.7' }}
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.6.8' }}
         run: gh release create "$RELEASE_TAG" release/* --target "$GITHUB_SHA" --title "sg0hann Boost $RELEASE_TAG" --notes-file RELEASE_NOTES.md

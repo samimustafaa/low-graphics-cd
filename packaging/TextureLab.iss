@@ -1,4 +1,4 @@
-#define AppVersion "1.6.7"
+#define AppVersion "1.6.8"
 [Setup]
 AppId={{5AF53953-9946-4A0A-BD65-2ED4641369B1}
 AppName=sg0hann Boost
@@ -19,7 +19,7 @@ LicenseFile=..\LICENSE.txt
 InfoBeforeFile=install_notes.txt
 CloseApplications=yes
 [Files]
-Source: "..\dist\TextureLab.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\TextureLab\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "TextureLab-installed.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\app.ico"; DestDir: "{app}"; DestName: "sg0hann-boost.ico"; Flags: ignoreversion
 [InstallDelete]

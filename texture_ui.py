@@ -226,7 +226,7 @@ class App:
         self.route = 'Graphics'
         self.font = 'Segoe UI' if 'Segoe UI' in tkfont.families(root) else 'Helvetica'
         self.wrapped_labels = []
-        root.title('sg0hann Boost 1.6.7')
+        root.title('sg0hann Boost 1.6.8')
         scale = float(root.tk.call('tk', 'scaling')) / (96 / 72)
         root.withdraw()
         self.work_area = monitor_work_area(root)
@@ -262,7 +262,7 @@ class App:
         for name in ('Graphics', 'Diagnostics', 'About'):
             self.nav[name] = self.button(self.sidebar, name, lambda n=name: self.show(n), quiet=True)
             self.nav[name].pack(side='left', padx=5, pady=12)
-        self.label(self.sidebar, 'v1.6.7', 9, MUTED).pack(side='right', padx=28)
+        self.label(self.sidebar, 'v1.6.8', 9, MUTED).pack(side='right', padx=28)
         body = tk.Frame(root, bg=BG)
         body.pack(fill='both', expand=True)
         self.update_banner = self.label(body,'New update - update the app now',9,SUCCESS,True,anchor='center',cursor='hand2')
@@ -373,7 +373,7 @@ class App:
             return
         self.update_busy = True
         def worker():
-            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.7'), manual)))
+            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.8'), manual)))
             except Exception as error: self.jobs.put(('update_error', (str(error), manual)))
         threading.Thread(target=worker, daemon=True).start()
 
@@ -389,7 +389,8 @@ class App:
         if release.version in self.offered and not manual: return
         self.offered.add(release.version)
         self.reveal()
-        if not messagebox.askyesno('sg0hann Boost update', f'Version {release.version} is available. Download, verify and install it now?\n\nsg0hann Boost will close and reopen. Your game settings will be kept.', parent=self.root): return
+        migration = ('\n\nThis installs sg0hann Boost in your per-user apps folder. Your portable copy stays where it is.' if release.filename.startswith('TextureLab-Setup-') and not update_manager.is_installed() else '')
+        if not messagebox.askyesno('sg0hann Boost update', f'Version {release.version} is available. Download, verify and install it now?\n\nsg0hann Boost will close and reopen. Your game settings will be kept.{migration}', parent=self.root): return
         self.update_busy = True
         self.status.set('Downloading and verifying update…')
         def worker():
@@ -776,7 +777,8 @@ def main():
             assert pin_icon.read_bytes() == (core.ROOT / 'app.ico').read_bytes()
             data = (core.ROOT / core.DLL).read_bytes()
             assert core.sha(data) == (core.ROOT / 'DLL_SHA256.txt').read_text().split()[0]
-            assert (core.ROOT / 'TextureLab-Updater.exe').read_bytes()[:2] == b'MZ'
+            helper = core.ROOT / 'TextureLab-Updater.exe'
+            if helper.is_file(): assert helper.read_bytes()[:2] == b'MZ'
             with tempfile.TemporaryDirectory() as temp:
                 folder = Path(temp);core.install(folder, data)
                 core.save_preset(folder, 6)
@@ -787,7 +789,7 @@ def main():
                 app.show(page);root.update_idletasks()
                 assert app.content.winfo_reqheight() <= app.content.winfo_height(), f'{page} page clips vertically: {app.content.winfo_reqheight()} > {app.content.winfo_height()}'
                 assert app.content.winfo_reqwidth() <= app.content.winfo_width(), f'{page} page clips horizontally: {app.content.winfo_reqwidth()} > {app.content.winfo_width()}'
-            Path(sys.argv[2]).write_text(json.dumps({'title':root.title(), 'standalone':bool(getattr(sys,'frozen',False)), 'profiles':[p[1] for p in PROFILES], 'bundle_hash_ok':True, 'fake_install_apply_restore_ok':True}), encoding='utf-8')
+            Path(sys.argv[2]).write_text(json.dumps({'title':root.title(), 'standalone':bool(getattr(sys,'frozen',False)), 'bundle_mode':('onedir' if core.ROOT.name=='_internal' and core.ROOT.parent==Path(sys.executable).resolve().parent else 'onefile'), 'profiles':[p[1] for p in PROFILES], 'bundle_hash_ok':True, 'fake_install_apply_restore_ok':True}), encoding='utf-8')
             app.close()
         root.after(400, smoke)
     try: root.mainloop()

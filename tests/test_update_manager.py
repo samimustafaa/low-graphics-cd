@@ -19,7 +19,7 @@ class UpdateTests(unittest.TestCase):
     def test_version_and_release_selection(self):
         self.assertGreater(u.version_tuple('1.10.0'),u.version_tuple('1.9.9'))
         for installed in (True,False):
-            r=self.release(installed=installed)
+            r=self.release(installed=True)
             self.assertEqual(u.parse_release(self.metadata(r),'1.2.0',installed),r.__class__(r.version,r.filename,r.url,r.size,r.sums_url,f'https://github.com/{u.REPOSITORY}/releases/tag/v{r.version}'))
             self.assertIsNone(u.parse_release(self.metadata(r),'1.3.0',installed))
             self.assertIsNone(u.parse_release(self.metadata(r),'2.0.0',installed))
@@ -62,6 +62,17 @@ class UpdateTests(unittest.TestCase):
             helper=root/'bundle';helper.mkdir();(helper/'TextureLab-Updater.exe').write_bytes(b'MZhelper')
             u.start_update(candidate,digest,helper,False,exe,pid=123)
             self.assertEqual(run.call_args.args[0][1:],['123',str(candidate),str(exe),digest])
+    def test_portable_install_migration_keeps_original_folder(self):
+        with tempfile.TemporaryDirectory() as temp, patch.object(u.subprocess,'Popen') as run:
+            root=Path(temp);candidate=root/'TextureLab-Setup-1.6.8-abcdef012345.exe'
+            candidate.write_bytes(b'MZinstaller');digest=hashlib.sha256(candidate.read_bytes()).hexdigest()
+            exe=root/'portable'/'TextureLab.exe';exe.parent.mkdir()
+            u.start_update(candidate,digest,root,installed=False,executable=exe)
+            args=run.call_args.args[0]
+            self.assertEqual(args[0],str(candidate));self.assertIn('/TEXTURELABUPDATE=1',args)
+            self.assertFalse(any(arg.startswith('/DIR=') for arg in args))
+            self.assertFalse((root/'TextureLab-Updater.exe').exists())
+
     def test_installed_marker(self):
         with tempfile.TemporaryDirectory() as temp:
             p=Path(temp)/'TextureLab.exe'

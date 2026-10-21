@@ -10,6 +10,8 @@ Lower graphics for Creative Destruction, made for low-end PCs and laptops.
 - Shows which preset you applied.
 - Checks for updates and can stay in the system tray.
 
+**Download the Setup EXE** for a normal installation, or extract the entire Portable ZIP. The separate single-file EXE is a bridge for older portable updaters. Release checksums and scan status are included; a clean VirusTotal result is not guaranteed.
+
 ## Getting started
 
 1. Install the app and close the game.
