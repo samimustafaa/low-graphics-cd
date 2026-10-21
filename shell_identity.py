@@ -13,7 +13,7 @@ import tempfile
 import uuid
 
 APP_ID = 'sg0hann.TextureLab'
-DISPLAY_NAME = 'sg0hann Boost'
+DISPLAY_NAME = 'sg0hann BOOST'
 
 class GUID(c.Structure):
     _fields_ = [('data1',c.c_uint32),('data2',c.c_uint16),('data3',c.c_uint16),('data4',c.c_ubyte*8)]

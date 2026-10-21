@@ -1,4 +1,4 @@
-"""sg0hann Boost desktop interface. Standard-library Tk desktop interface."""
+"""sg0hann BOOST desktop interface. Standard-library Tk desktop interface."""
 from pathlib import Path
 import json
 import os
@@ -226,7 +226,7 @@ class App:
         self.route = 'Graphics'
         self.font = 'Segoe UI' if 'Segoe UI' in tkfont.families(root) else 'Helvetica'
         self.wrapped_labels = []
-        root.title('sg0hann Boost 1.6.8')
+        root.title('sg0hann BOOST 1.6.9')
         scale = float(root.tk.call('tk', 'scaling')) / (96 / 72)
         root.withdraw()
         self.work_area = monitor_work_area(root)
@@ -256,13 +256,13 @@ class App:
         tk.Label(self.sidebar, image=self.small_logo, bg=PANEL).pack(side='left', padx=(22, 10), pady=12)
         brand = tk.Frame(self.sidebar, bg=PANEL)
         brand.pack(side='left', padx=(0, 20))
-        self.label(brand, 'sg0hann Boost', 14, TEXT, True).pack(anchor='w')
+        self.label(brand, 'sg0hann BOOST', 14, TEXT, True).pack(anchor='w')
         self.label(brand, 'Creative Destruction Graphics Tool', 8, MUTED).pack(anchor='w')
         self.nav = {}
         for name in ('Graphics', 'Diagnostics', 'About'):
             self.nav[name] = self.button(self.sidebar, name, lambda n=name: self.show(n), quiet=True)
             self.nav[name].pack(side='left', padx=5, pady=12)
-        self.label(self.sidebar, 'v1.6.8', 9, MUTED).pack(side='right', padx=28)
+        self.label(self.sidebar, 'v1.6.9', 9, MUTED).pack(side='right', padx=28)
         body = tk.Frame(root, bg=BG)
         body.pack(fill='both', expand=True)
         self.update_banner = self.label(body,'New update - update the app now',9,SUCCESS,True,anchor='center',cursor='hand2')
@@ -373,7 +373,7 @@ class App:
             return
         self.update_busy = True
         def worker():
-            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.8'), manual)))
+            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.9'), manual)))
             except Exception as error: self.jobs.put(('update_error', (str(error), manual)))
         threading.Thread(target=worker, daemon=True).start()
 
@@ -382,15 +382,15 @@ class App:
         if not release:
             self.available_release = None
             self.update_banner.pack_forget()
-            if manual: messagebox.showinfo('Updates', 'sg0hann Boost is up to date.', parent=self.root)
+            if manual: messagebox.showinfo('Updates', 'sg0hann BOOST is up to date.', parent=self.root)
             return
         self.available_release = release
         self.update_banner.pack(before=self.content,fill='x',padx=22,pady=(4,0))
         if release.version in self.offered and not manual: return
         self.offered.add(release.version)
         self.reveal()
-        migration = ('\n\nThis installs sg0hann Boost in your per-user apps folder. Your portable copy stays where it is.' if release.filename.startswith('TextureLab-Setup-') and not update_manager.is_installed() else '')
-        if not messagebox.askyesno('sg0hann Boost update', f'Version {release.version} is available. Download, verify and install it now?\n\nsg0hann Boost will close and reopen. Your game settings will be kept.{migration}', parent=self.root): return
+        migration = ('\n\nThis installs sg0hann BOOST in your per-user apps folder. Your portable copy stays where it is.' if release.filename.startswith(('TextureLab-Setup-', 'sg0hann-BOOST-Setup-')) and not update_manager.is_installed() else '')
+        if not messagebox.askyesno('sg0hann BOOST update', f'Version {release.version} is available. Download, verify and install it now?\n\nsg0hann BOOST will close and reopen. Your game settings will be kept.{migration}', parent=self.root): return
         self.update_busy = True
         self.status.set('Downloading and verifying update…')
         def worker():
@@ -597,7 +597,7 @@ class App:
         self.label(self.content, size=9, color=MUTED, textvariable=self.status, wraplength=740).pack(anchor='w', pady=(12, 0))
 
     def about(self):
-        self.heading('', 'About sg0hann Boost', 'Creative Destruction Graphics Tool')
+        self.heading('', 'About sg0hann BOOST', 'Creative Destruction Graphics Tool')
         frame=self.card(self.content);frame.pack(fill='x')
         self.label(frame,'Made for low-end PCs and laptops.',10,TEXT,wraplength=700).pack(anchor='w')
         self.creator_label=self.label(frame,'Created by sg0hann',12,TEXT,True)
@@ -621,7 +621,7 @@ class App:
         except (OSError, ValueError, KeyError) as error:
             self.status.set(str(error))
             if self.route=='Graphics': self.status_label.configure(fg=DANGER)
-            messagebox.showerror('sg0hann Boost',str(error),parent=self.root)
+            messagebox.showerror('sg0hann BOOST',str(error),parent=self.root)
 
     def load_selected(self):
         if not self.path.get().strip(): return
@@ -738,7 +738,7 @@ class App:
 
 
 def main():
-    if os.name != 'nt': raise SystemExit('Run sg0hann Boost on Windows.')
+    if os.name != 'nt': raise SystemExit('Run sg0hann BOOST on Windows.')
     # DPI awareness affects this GUI process only, not the game.
     import ctypes
     try:

@@ -18,7 +18,7 @@ class UITests(unittest.TestCase):
         except tk.TclError: self.skipTest('No display available')
         app = App(root, remember=False)
         self.addCleanup(app.close)
-        self.assertEqual(root.title(), "sg0hann Boost 1.6.8")
+        self.assertEqual(root.title(), "sg0hann BOOST 1.6.9")
         with tempfile.TemporaryDirectory() as temp:
             exe = Path(temp) / 'client.exe'
             data = bytearray(160); data[:2] = b'MZ'
@@ -90,7 +90,7 @@ class UITests(unittest.TestCase):
         app.reveal(); self.assertFalse(app.hidden); root.update()
         with patch('texture_ui.messagebox.askyesno',return_value=False) as popup:
             from update_manager import Release
-            r=Release('1.6.8','file','',1,'','')
+            r=Release('1.6.9','file','',1,'','')
             app.offer_update(r,False); popup.assert_called_once()
             root.update()
             self.assertTrue(app.update_banner.winfo_ismapped())

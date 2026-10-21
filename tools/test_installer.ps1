@@ -9,7 +9,7 @@ if (!$result.bundle_hash_ok -or !$result.fake_install_apply_restore_ok) { throw 
 if ($result.bundle_mode -ne 'onedir') { throw 'Main build unexpectedly extracts a temporary runtime' }
 # Verify the portable ZIP, including all its runtime dependencies.
 $zipTarget = Join-Path $env:TEMP 'sg0hann-Boost-zip-test'
-Expand-Archive release\sg0hann-Boost-Portable-1.6.8.zip $zipTarget -Force
+Expand-Archive release\sg0hann-BOOST-Portable-1.6.9.zip $zipTarget -Force
 $zipSmoke = Join-Path $env:TEMP 'sg0hann-Boost-zip-smoke.json'
 $p = Start-Process -FilePath "$zipTarget\TextureLab\TextureLab.exe" -ArgumentList '--smoke-test', "`"$zipSmoke`"" -PassThru
 if (!$p.WaitForExit(45000)) { $p.Kill(); throw 'Portable ZIP smoke timed out' }
@@ -26,11 +26,11 @@ $target = Join-Path $env:TEMP 'TextureLab-install-test'
 New-Item -ItemType Directory -Force $target | Out-Null
 Copy-Item dist\legacy\TextureLab.exe "$target\TextureLab.exe" -Force
 Copy-Item packaging\TextureLab-installed.txt $target -Force
-$p = Start-Process -FilePath "$PWD\release\TextureLab-Setup-1.6.8.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$target`"" -Wait -PassThru
+$p = Start-Process -FilePath "$PWD\release\sg0hann-BOOST-Setup-1.6.9.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$target`"" -Wait -PassThru
 if ($p.ExitCode -ne 0 -or !(Test-Path "$target\TextureLab.exe")) { throw 'Silent installer failed' }
 if (!(Test-Path "$target\TextureLab-installed.txt")) { throw 'Installed update marker missing' }
 # Check the shortcut Windows can select when the app is pinned.
-$link = Join-Path ([Environment]::GetFolderPath('Programs')) 'sg0hann Boost\sg0hann Boost.lnk'
+$link = Join-Path ([Environment]::GetFolderPath('Programs')) 'sg0hann BOOST\sg0hann BOOST.lnk'
 if (!(Test-Path $link)) { throw 'Branded Start menu shortcut missing' }
 $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($link)
 python -c "import os,sys; assert os.path.samefile(sys.argv[1],sys.argv[2]), sys.argv[1:]" $shortcut.TargetPath "$target\TextureLab.exe"
@@ -40,7 +40,7 @@ $shell = New-Object -ComObject Shell.Application
 $item = $shell.NameSpace((Split-Path $link)).ParseName((Split-Path $link -Leaf))
 if ($item.ExtendedProperty('System.AppUserModel.ID') -ne 'sg0hann.TextureLab') { throw 'Shortcut AppUserModelID is wrong' }
 $metadata = (Get-Item "$target\TextureLab.exe").VersionInfo
-if ($metadata.ProductName -ne 'sg0hann Boost' -or $metadata.FileDescription -ne 'sg0hann Boost') { throw 'Branded EXE metadata missing' }
+if ($metadata.ProductName -ne 'sg0hann BOOST' -or $metadata.FileDescription -ne 'sg0hann BOOST') { throw 'Branded EXE metadata missing' }
 Write-Host 'PASS: branded shortcut, persistent shortcut icon, matching AppUserModelID and EXE metadata'
 $installed = Join-Path $env:TEMP 'TextureLab-installed-smoke.json'
 $p = Start-Process -FilePath "$target\TextureLab.exe" -ArgumentList '--smoke-test', "`"$installed`"" -PassThru

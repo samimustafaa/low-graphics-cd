@@ -67,8 +67,9 @@ def parse_release(data, current_version, installed):
         return None
     version = tag.removeprefix('v')
     # Folder/ZIP and legacy bridge users migrate through the same installer.
-    filename = f'TextureLab-Setup-{version}.exe'
     assets = {a['name']: a for a in info.get('assets', [])}
+    filename = f'sg0hann-BOOST-Setup-{version}.exe'
+    if filename not in assets: filename = f'TextureLab-Setup-{version}.exe'
     target, sums = assets.get(filename), assets.get('SHA256SUMS.txt')
     if not target or not sums:
         raise ValueError('The release has no compatible app and checksum file.')
@@ -182,7 +183,7 @@ def start_update(candidate, digest, root, installed=None, executable=None, pid=N
         raise ValueError('The verified update file changed. Installation was cancelled.')
     executable = Path(executable or sys.executable).resolve()
     installed = is_installed(executable) if installed is None else installed
-    installer = bool(re.fullmatch(r'TextureLab-Setup-\d+\.\d+\.\d+-[0-9a-f]{12}\.exe', candidate.name))
+    installer = bool(re.fullmatch(r'(?:TextureLab|sg0hann-BOOST)-Setup-\d+\.\d+\.\d+-[0-9a-f]{12}\.exe', candidate.name))
     if installed or installer:
         args = [str(candidate), '/SILENT', '/SUPPRESSMSGBOXES', '/NORESTART',
                 '/TEXTURELABUPDATE=1']

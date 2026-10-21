@@ -1,9 +1,8 @@
-# sg0hann Boost 1.6.8
+# sg0hann BOOST 1.6.9
 
-- **Recommended: TextureLab-Setup-1.6.8.exe.** The installed app now uses a normal runtime folder instead of unpacking Python into a temporary directory on every launch.
-- Added **sg0hann-Boost-Portable-1.6.8.zip**. Extract the whole folder and run TextureLab.exe inside it.
-- Preserved installed updates. ZIP users are told when an update will install the app.
-- **TextureLab-1.6.8.exe is a transitional one-file compatibility build** for older portable updaters; its future updates use the regular installer. New users should choose Setup or ZIP.
-- Added payload checksums and SCAN-RESULTS.json. This reports whether Defender could run, its engine/signature versions, and scan output. A reported detection or scan error blocks publication. An unavailable scan is explicitly marked not run.
+- The public app name is now **sg0hann BOOST**, including the installer, shortcuts, tray, taskbar display name, and EXE metadata.
+- Download **sg0hann-BOOST-Setup-1.6.9.exe** to install the app. Uploaded files now show the sg0hann BOOST brand.
+- The portable archive is **sg0hann-BOOST-Portable-1.6.9.zip**.
+- Automatic updates prefer the branded installer. Old TextureLab asset names remain as compatibility copies so existing users can still update.
 
-These packaging changes do not establish a clean VirusTotal result. Builds remain unsigned because no publisher signing certificate is configured. The graphics helper is still 1.6.7; game settings and recovery backups are unchanged.
+Graphics settings, recovery backups, and the 1.6.7 game helper are unchanged. Scan status and checksums are included.

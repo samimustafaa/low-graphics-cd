@@ -73,6 +73,21 @@ class UpdateTests(unittest.TestCase):
             self.assertFalse(any(arg.startswith('/DIR=') for arg in args))
             self.assertFalse((root/'TextureLab-Updater.exe').exists())
 
+    def test_branded_asset_is_preferred_and_verified(self):
+        legacy=self.release(installed=True)
+        branded='sg0hann-BOOST-Setup-'+legacy.version+'.exe'
+        info=json.loads(self.metadata(legacy))
+        info['assets'].append({'name':branded,'size':legacy.size,'browser_download_url':legacy.url.replace(legacy.filename,branded)})
+        release=u.parse_release(json.dumps(info),'1.2.0',False)
+        self.assertEqual(release.filename,branded)
+        self.assertTrue(release.url.endswith('/'+branded))
+        with tempfile.TemporaryDirectory() as temp,patch.object(u.subprocess,'Popen') as run:
+            root=Path(temp);candidate=root/'sg0hann-BOOST-Setup-1.6.9-abcdef012345.exe'
+            candidate.write_bytes(b'MZinstaller');digest=hashlib.sha256(candidate.read_bytes()).hexdigest()
+            u.start_update(candidate,digest,root,installed=False,executable=root/'TextureLab.exe')
+            self.assertIn('/TEXTURELABUPDATE=1',run.call_args.args[0])
+            self.assertFalse(any(arg.startswith('/DIR=') for arg in run.call_args.args[0]))
+
     def test_installed_marker(self):
         with tempfile.TemporaryDirectory() as temp:
             p=Path(temp)/'TextureLab.exe'
