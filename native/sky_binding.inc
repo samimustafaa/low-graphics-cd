@@ -20,20 +20,23 @@ static IDirect3DPixelShader9* skyForBinding(DeviceContext* c,IDirect3DPixelShade
     UINT capacity=bytes;auto code=(DWORD*)HeapAlloc(GetProcessHeap(),0,capacity);
     if(!code)return shader;
     SkyMetadata m={};
+    size_t opaqueWords=0;
     if(SUCCEEDED(IDirect3DPixelShader9_GetFunction(shader,code,&bytes)) && bytes<=capacity && bytes%4==0 &&
-       findSkyMetadata((const uint32_t*)code,bytes/4,&m)) {
+       ((c->config.opaqueStructures && (opaqueWords=makeOpaqueStructure((const uint32_t*)code,bytes/4,nullptr))) ||
+        (c->config.neutralSky && findSkyMetadata((const uint32_t*)code,bytes/4,&m)))) {
         ++c->skyBindMatches;
-        size_t words=graySkyWordCount(m);
+        size_t words=opaqueWords?opaqueWords:graySkyWordCount(m);
         auto solid=(DWORD*)HeapAlloc(GetProcessHeap(),0,words*4);
         if(solid) {
-            makeGraySky(m,(uint32_t*)solid,c->config.blackSky);
+            if(opaqueWords)makeOpaqueStructure((const uint32_t*)code,bytes/4,(uint32_t*)solid);
+            else makeGraySky(m,(uint32_t*)solid,c->config.blackSky);
             // Creation-time replacements already have the correct program.
             if(words*4!=bytes || memcmp(code,solid,bytes)!=0) {
                 IDirect3DPixelShader9* replacement=nullptr;
                 HRESULT hr=c->original->CreatePixelShader(c->real,solid,&replacement);
                 if(SUCCEEDED(hr) && replacement) {
                     entry.replacement=replacement;
-                    logLine(c->config.blackSky?"Black SKY replacement cached at shader bind.":"Gray SKY replacement cached at shader bind.");
+                    logLine(opaqueWords?"Opaque structure replacement cached; original RGB retained.":c->config.blackSky?"Black SKY replacement cached at shader bind.":"Gray SKY replacement cached at shader bind.");
                 } else logLine("Sky bind replacement rejected; original retained.");
             }
             HeapFree(GetProcessHeap(),0,solid);
@@ -44,7 +47,7 @@ static IDirect3DPixelShader9* skyForBinding(DeviceContext* c,IDirect3DPixelShade
 }
 static HRESULT STDMETHODCALLTYPE setPixelShader(IDirect3DDevice9* d,IDirect3DPixelShader9* shader) {
     auto c=ctx(d);Hold<DeviceContext> hold(c);CallGuard entry;
-    if(!entry.outer || !shader || !c->config.enabled || !c->config.neutralSky || c->config.bypass ||
+    if(!entry.outer || !shader || !c->config.enabled || !(c->config.neutralSky || c->config.opaqueStructures) || c->config.bypass ||
        c->blocked || c->recording || !ownsThread(c))return c->original->SetPixelShader(c->real,shader);
     auto mapped=skyForBinding(c,shader);
     HRESULT hr=c->original->SetPixelShader(c->real,mapped);
@@ -59,7 +62,7 @@ static HRESULT STDMETHODCALLTYPE setPixelShader(IDirect3DDevice9* d,IDirect3DPix
 static HRESULT STDMETHODCALLTYPE getPixelShader(IDirect3DDevice9* d,IDirect3DPixelShader9** out) {
     auto c=ctx(d);Hold<DeviceContext> hold(c);CallGuard entry;
     HRESULT hr=c->original->GetPixelShader(c->real,out);
-    if(entry.outer && c->config.enabled && c->config.neutralSky && !c->config.bypass && SUCCEEDED(hr) && out && *out && ownsThread(c)) {
+    if(entry.outer && c->config.enabled && (c->config.neutralSky || c->config.opaqueStructures) && !c->config.bypass && SUCCEEDED(hr) && out && *out && ownsThread(c)) {
         for(const auto& e:c->skyBindings)if(e.replacement==*out) {
             IDirect3DPixelShader9_AddRef(e.source);IDirect3DPixelShader9_Release(*out);*out=e.source;break;
         }

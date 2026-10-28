@@ -1,4 +1,4 @@
-"""CD Texture Lab 1.6.7 — public COM forwarding wrappers, Windows x86 Direct3D 9.
+"""CD Texture Lab 1.6.10 — public COM forwarding wrappers, Windows x86 Direct3D 9.
 
 Python 3.9+ standard library only. No network operations. See README.md.
 """
@@ -164,13 +164,13 @@ def require_closed(exe):
             raise ValueError("To change the textures you need to leave the game! Close the game completely first.")
 
 
-def settings(bias=2, bypass=False, neutral_sky=True, allow_mipmaps=True, collect_stats=False, black_sky=False, flat_ground=False):
+def settings(bias=2, bypass=False, neutral_sky=True, allow_mipmaps=True, collect_stats=False, black_sky=False, flat_ground=False, opaque_structures=False):
     bias = int(bias)
     if bias not in PRESETS:
         raise ValueError("Choose Normal, Low, Ultra, or Potato Graphics.")
     actual_bias, size = PRESETS[bias]
     return (f"{MARKER}\n[TextureLab]\nEnabled=1\nBias={actual_bias}\n"
-            f"MinTextureSize={size}\nCollectStats={int(collect_stats)}\nNeutralSky={int(bias == 6 and neutral_sky)}\nBlackSky={int(bias == 6 and neutral_sky and black_sky)}\nFlatGround={int(bias == 6 and flat_ground)}\nIncludeAutogen={int(bias == 6)}\nMinMipLevel={4 if bias == 6 and allow_mipmaps else 0}\n"
+            f"MinTextureSize={size}\nCollectStats={int(collect_stats)}\nNeutralSky={int(bias == 6 and neutral_sky)}\nBlackSky={int(bias == 6 and neutral_sky and black_sky)}\nFlatGround={int(bias == 6 and flat_ground)}\nOpaqueStructures={int(bias == 6 and opaque_structures)}\nIncludeAutogen={int(bias == 6)}\nMinMipLevel={4 if bias == 6 and allow_mipmaps else 0}\n"
             f"CoarsestMip=0\nForceMipFilter={int(bias == 6 and allow_mipmaps)}\nBypass={int(bypass)}\n").encode("ascii")
 
 
@@ -203,7 +203,7 @@ def install(folder, dll_bytes):
             raise InstallationConflict(f"{p.name} already exists. Nothing was overwritten. "
                                        "Click Repair installation to back up the existing files and install BOOST.")
     created = []
-    blobs = [dll_bytes, settings(), json.dumps({"app": APP, "build_version": "1.6.7", "dll_sha256": sha(dll_bytes)}, indent=2).encode()]
+    blobs = [dll_bytes, settings(), json.dumps({"app": APP, "build_version": "1.6.10", "dll_sha256": sha(dll_bytes)}, indent=2).encode()]
     try:
         for path, data in zip(targets, blobs):
             with path.open("xb") as f:
@@ -221,8 +221,8 @@ def apply_bias(folder, bias, bypass=False):
         record = owned_manifest(folder)
     except (OSError, ValueError) as exc:
         raise InstallationConflict('The installation record cannot be verified. Click Repair installation.') from exc
-    if bypass and record.get("build_version") != "1.6.7":
-        raise ValueError("Install/update the 1.6.7 helper before using Bypass. Restart the game afterward.")
+    if bypass and record.get("build_version") != "1.6.10":
+        raise ValueError("Install/update the 1.6.10 helper before using Bypass. Restart the game afterward.")
     ini = folder / INI
     if ini.is_symlink() or not ini.is_file() or not ini.read_text(encoding="ascii").startswith(MARKER + "\n"):
         raise ValueError("The settings file is missing or is not owned by this app.")
@@ -253,7 +253,7 @@ def uninstall(folder):
 def diagnostic_payload(exe, events=None):
     """Read only. Collect no memory dump or unrelated Windows events."""
     exe = Path(exe)
-    data = {"system.txt": f"Texture Lab 1.6.7 diagnostic export\nWindows/platform: {platform.platform()}\n"
+    data = {"system.txt": f"Texture Lab 1.6.10 diagnostic export\nWindows/platform: {platform.platform()}\n"
             f"Python: {platform.python_version()} ({struct.calcsize('P') * 8}-bit)\n"
             f"Game executable: {exe}\n"}
     for name in (LOG, INI, MANIFEST):
@@ -309,7 +309,7 @@ def install_or_update(folder, dll_bytes):
     names = (DLL, INI, MANIFEST)
     for name in names:
         shutil.copy2(folder / name, backup / name)
-    blobs = (dll_bytes, ini.read_bytes(), json.dumps({"app": APP, "build_version": "1.6.7", "dll_sha256": sha(dll_bytes)}, indent=2).encode())
+    blobs = (dll_bytes, ini.read_bytes(), json.dumps({"app": APP, "build_version": "1.6.10", "dll_sha256": sha(dll_bytes)}, indent=2).encode())
     try:
         for name, blob in zip(names, blobs):
             _atomic_write(folder / name, blob)
@@ -343,14 +343,14 @@ def read_settings(folder):
     parser.read(Path(folder) / INI)
     section = parser["TextureLab"] if parser.has_section("TextureLab") else {}
     return {"bias": int(section.get("Bias", "2")), "size": int(section.get("MinTextureSize", "256")),
-            "enabled": section.get("Enabled", "1") != "0", "bypass": section.get("Bypass", "0") != "0", "flat_ground": section.get("FlatGround", "0") != "0", "black_sky": section.get("BlackSky", "0") != "0", "neutral_sky": section.get("NeutralSky", "0") != "0", "allow_mipmaps": section.get("ForceMipFilter", "0") != "0", "collect_stats": section.get("CollectStats", "0") != "0"}
+            "opaque_structures": section.get("OpaqueStructures", "0") != "0", "enabled": section.get("Enabled", "1") != "0", "bypass": section.get("Bypass", "0") != "0", "flat_ground": section.get("FlatGround", "0") != "0", "black_sky": section.get("BlackSky", "0") != "0", "neutral_sky": section.get("NeutralSky", "0") != "0", "allow_mipmaps": section.get("ForceMipFilter", "0") != "0", "collect_stats": section.get("CollectStats", "0") != "0"}
 
 
-def save_preset(folder, mode, enabled=True, bypass=False, neutral_sky=True, allow_mipmaps=True, collect_stats=False, black_sky=False, flat_ground=False):
-    data = settings(mode, bypass=bypass, neutral_sky=neutral_sky, allow_mipmaps=allow_mipmaps, collect_stats=collect_stats, black_sky=black_sky, flat_ground=flat_ground)
+def save_preset(folder, mode, enabled=True, bypass=False, neutral_sky=True, allow_mipmaps=True, collect_stats=False, black_sky=False, flat_ground=False, opaque_structures=False):
+    data = settings(mode, bypass=bypass, neutral_sky=neutral_sky, allow_mipmaps=allow_mipmaps, collect_stats=collect_stats, black_sky=black_sky, flat_ground=flat_ground, opaque_structures=opaque_structures)
     if not enabled: data = data.replace(b"Enabled=1", b"Enabled=0")
     record = owned_manifest(Path(folder))
-    if record.get("build_version") != "1.6.7":
+    if record.get("build_version") != "1.6.10":
         raise ValueError("Click Install / update first to replace the old helper.")
     current = Path(folder) / DLL
     if current.is_symlink() or not current.is_file() or sha(current.read_bytes()) != record["dll_sha256"]:

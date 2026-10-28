@@ -19,9 +19,12 @@ static Shader* object(const std::vector<DWORD>& code,bool generated=false) {
 }
 static HRESULT STDMETHODCALLTYPE create(IDirect3DDevice9*,const DWORD* code,IDirect3DPixelShader9** out) {
  ++creates;if(rejectCreate){*out=nullptr;return D3DERR_INVALIDCALL;}
- SkyMetadata m={};size_t count=2+((code[1]>>16)&0x7fff)+10;
- assert(findSkyMetadata((const uint32_t*)code,count,&m));
- auto result=object(std::vector<DWORD>(code,code+graySkyWordCount(m)),true);*out=(IDirect3DPixelShader9*)result;return S_OK;
+ size_t count=1;
+ while(count<262144 && (code[count]&0xffff)!=0xffff) {
+  uint32_t op=code[count]&0xffff;count+=1+(op==0xfffe?((code[count]>>16)&0x7fff):((code[count]>>24)&15));
+ }
+ assert(count<262144);++count;
+ auto result=object(std::vector<DWORD>(code,code+count),true);*out=(IDirect3DPixelShader9*)result;return S_OK;
 }
 static HRESULT STDMETHODCALLTYPE bind(IDirect3DDevice9*,IDirect3DPixelShader9* p) {
  auto s=(Shader*)p;if(s && s->generated && rejectBind)return D3DERR_INVALIDCALL;
@@ -60,8 +63,19 @@ int main(){
  rejectCreate=rejectBind=false;source->fail=false;c.blocked=c.recording=0;c.config.bypass=false;
  clearSkyBindings(&c);assert(SUCCEEDED(setPixelShader(wrapper,(IDirect3DPixelShader9*)source)));
  auto ready=bound;unsigned before=creates;assert(SUCCEEDED(setPixelShader(wrapper,(IDirect3DPixelShader9*)ready)) && creates==before); // No double replacement.
+ clearSkyBindings(&c);c.config.neutralSky=false;c.config.opaqueStructures=true;
+ const char buildNames[]="\0dismantling_scale\0rongjie_fazhi\0rongjiezhi\0alpha_intensty\0AlphaMtl\0diffuse_instensty\0sam_other0\0";
+ auto structure=object(fixture(buildNames,sizeof(buildNames)));
+ before=creates;assert(SUCCEEDED(setPixelShader(wrapper,(IDirect3DPixelShader9*)structure)) && bound!=structure && creates==before+1);
+ assert(bound->code[bound->code.size()-3]==0x80080800u);
+ auto buildReady=bound;unsigned reads=structure->reads;
+ for(int n=0;n<1000;++n)assert(SUCCEEDED(setPixelShader(wrapper,(IDirect3DPixelShader9*)structure)) && bound==buildReady);
+ assert(structure->reads==reads && creates==before+1);
+ IDirect3DPixelShader9* logical=nullptr;assert(SUCCEEDED(getPixelShader(wrapper,&logical)) && logical==(IDirect3DPixelShader9*)structure);drop(logical);
+ assert(SUCCEEDED(setPixelShader(wrapper,(IDirect3DPixelShader9*)floor)) && bound==floor);
+ c.config.opaqueStructures=false;assert(SUCCEEDED(setPixelShader(wrapper,(IDirect3DPixelShader9*)structure)) && bound==structure);
  setPixelShader(wrapper,nullptr);clearSkyBindings(&c);
- assert(source->refs==1 && floor->refs==1);
+ assert(source->refs==1 && floor->refs==1 && structure->refs==1);
  for(const auto& s:objects)if(s->generated)assert(s->refs==0);
  puts("PASS: native-created sky bind override, Gray/Black/Normal, floor exclusion, shader identity, 1000 cached binds, failure/reentry guards and reference cleanup");
 }

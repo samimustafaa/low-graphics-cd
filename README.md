@@ -6,7 +6,7 @@ Lower graphics for Creative Destruction, made for low-end PCs and laptops.
 
 - Four presets: Normal, Low, Ultra, and Potato Graphics.
 - Separate sky choices: Normal (blue) or Sky Gray.
-- Optional grass removal and flat ground in Potato Graphics.
+- Optional grass removal, flat ground, and experimental opaque structures in Potato Graphics.
 - Shows which preset you applied.
 - Checks for updates and can stay in the system tray.
 

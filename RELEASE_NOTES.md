@@ -5,6 +5,9 @@
 - Game selection now checks helper integrity before displaying an applied preset. Failed operations no longer leave a green success claim.
 - Missing or damaged bundled components now show reinstall and antivirus-history guidance.
 
-Graphics rendering is unchanged: the game helper remains 1.6.7. Opaque structure materials are not included in this release; they require the matching game shader/material files. No FPS gain or antivirus clearance is guaranteed.
+- Added optional **Opaque structures (experimental)** under **Potato Graphics**. Recognized scene_cj/scene_cj_pbr shader signatures force final structure opacity while preserving RGB, geometry, cutouts, and unrelated materials. Unrecognized variants remain unchanged.
+- The helper is now 1.6.10. After updating the app, close the game and click **Install / update** (or **Repair installation** if needed), enable the option, Apply, and relaunch.
+
+Synthetic renderer checks do not replace testing in your game version. No FPS gain, elimination of drops, or antivirus clearance is guaranteed.
 
 Download **sg0hann-BOOST-Setup-1.6.10.exe** or **sg0hann-BOOST-Portable-1.6.10.zip**. Scan results and checksums are included.

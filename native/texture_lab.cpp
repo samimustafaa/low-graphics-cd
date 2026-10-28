@@ -1,4 +1,4 @@
-// Texture Lab 1.6.7. Public COM forwarding wrappers. System objects, private
+// Texture Lab 1.6.10. Public COM forwarding wrappers. System objects, private
 // runtime layouts and runtime vtables are never modified. Original MIT source.
 #define CINTERFACE
 #define COBJMACROS
@@ -16,6 +16,7 @@
 #include <wchar.h>
 #include <stdio.h>
 #include "ground_shader.h"
+#include "structure_shader.h"
 
 
 static HMODULE selfModule, systemD3D;
@@ -47,14 +48,14 @@ static BOOL CALLBACK initialize(PINIT_ONCE, PVOID, PVOID*) {
     HMODULE pinned;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,
                       (LPCWSTR)selfModule,&pinned);
-    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.6.7 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
+    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.6.10 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
     logLine(line); return TRUE;
 }
 static FARPROC resolve(const char* name) {
     InitOnceExecuteOnce(&initOnce,initialize,nullptr,nullptr);
     return systemD3D?GetProcAddress(systemD3D,name):nullptr;
 }
-struct Config { bool enabled; int bias; UINT minSize; bool bypass; bool neutralSky, includeAutogen, allowMipmaps; UINT minimumMip; bool collectStats; bool blackSky; bool flatGround; };
+struct Config { bool enabled; int bias; UINT minSize; bool bypass; bool neutralSky, includeAutogen, allowMipmaps; UINT minimumMip; bool collectStats; bool blackSky; bool flatGround; bool opaqueStructures; };
 static Config readConfig() {
     int bias=(int)GetPrivateProfileIntW(L"TextureLab",L"Bias",2,iniPath);
     int size=(int)GetPrivateProfileIntW(L"TextureLab",L"MinTextureSize",256,iniPath);
@@ -68,7 +69,8 @@ static Config readConfig() {
             (UINT)(minimumMip<0?0:(minimumMip>4?4:minimumMip)),
             GetPrivateProfileIntW(L"TextureLab",L"CollectStats",0,iniPath)!=0,
             GetPrivateProfileIntW(L"TextureLab",L"BlackSky",0,iniPath)!=0,
-            GetPrivateProfileIntW(L"TextureLab",L"FlatGround",0,iniPath)!=0};
+            GetPrivateProfileIntW(L"TextureLab",L"FlatGround",0,iniPath)!=0,
+            GetPrivateProfileIntW(L"TextureLab",L"OpaqueStructures",0,iniPath)!=0};
 }
 struct CallGuard {
     bool outer;
@@ -382,7 +384,7 @@ static ULONG STDMETHODCALLTYPE releaseDevice(IDirect3DDevice9* d) {
     auto c=ctx(d); Hold<DeviceContext> hold(c);
     ULONG refs=(ULONG)InterlockedDecrement(&c->refs);
     if(!refs){
-        if(c->config.neutralSky){char summary[160];snprintf(summary,sizeof(summary),"Sky bind summary: reads=%lu matches=%lu unknown=%lu",c->skyBindReads,c->skyBindMatches,c->skyBindMisses);logLine(summary);}
+        if(c->config.neutralSky || c->config.opaqueStructures){char summary[160];snprintf(summary,sizeof(summary),"Sky bind summary: reads=%lu matches=%lu unknown=%lu",c->skyBindReads,c->skyBindMatches,c->skyBindMisses);logLine(summary);}
         clearSkyBindings(c);InterlockedExchange(&c->dead,1);
     }
     c->original->Release(c->real);return refs;

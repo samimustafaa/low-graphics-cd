@@ -5,11 +5,11 @@ from pathlib import Path
 import struct
 import sys, subprocess
 if len(sys.argv)==1:
-    for mode in ('gray','black','off'):
+    for mode in ('gray','black','off','opaque','opaque_off'):
         subprocess.run([sys.executable,__file__,mode],check=True)
     raise SystemExit(0)
 mode=sys.argv[1]
-assert mode in ('gray','black','off')
+assert mode in ('gray','black','off','opaque','opaque_off')
 from windows_texture_test import Present, method, release, check
 compiler=c.WinDLL('d3dcompiler_47.dll');compile_shader=compiler.D3DCompile
 compile_shader.argtypes=[c.c_void_p,c.c_size_t,c.c_char_p,c.c_void_p,c.c_void_p,c.c_char_p,c.c_char_p,w.UINT,w.UINT,c.POINTER(c.c_void_p),c.POINTER(c.c_void_p)];compile_shader.restype=c.c_long
@@ -30,7 +30,7 @@ SKIES=[
     'float4 skycolormid;float4 skycolorhigh;float4 bk_cloud_color;float cloud_thickness;float4 main():COLOR {return float4(0,0,1,1)+(skycolormid+skycolorhigh+bk_cloud_color+cloud_thickness)*0.00001;}'
 ]
 ini=Path('CD_TextureLab.ini');assert not ini.exists()
-ini.write_text(f'[TextureLab]\nEnabled=1\nBias=0\nFlatGround=0\nNeutralSky={int(mode!="off")}\nBlackSky={int(mode=="black")}\n',encoding='ascii')
+ini.write_text(f'[TextureLab]\nEnabled=1\nBias=0\nFlatGround=0\nNeutralSky={int(mode in ("gray","black"))}\nBlackSky={int(mode=="black")}\nOpaqueStructures={int(mode=="opaque")}\n',encoding='ascii')
 user=c.WinDLL('user32');user.CreateWindowExW.argtypes=[w.DWORD,w.LPCWSTR,w.LPCWSTR,w.DWORD,c.c_int,c.c_int,c.c_int,c.c_int,w.HWND,c.c_void_p,c.c_void_p,c.c_void_p];user.CreateWindowExW.restype=w.HWND;user.DestroyWindow.argtypes=[w.HWND]
 window=user.CreateWindowExW(0,'STATIC','Sky color test',0x80000000,0,0,64,64,None,None,None,None)
 factory=device=target=resource=native_device=None;shaders=[]
@@ -82,7 +82,7 @@ try:
                     actual_shader=c.c_void_p();check(method(native_device,108,c.c_long,c.POINTER(c.c_void_p))(native_device,c.byref(actual_shader)))
                     try:data=bytecode(actual_shader)
                     finally:release(actual_shader)
-                    if mode!='off':
+                    if mode in ('gray','black'):
                         rgb=0 if mode=='black' else 0x3f000000
                         expected=struct.pack('<6I',0x05000051,0xa00f0000,rgb,rgb,rgb,0x3f800000)
                         assert expected in data,f'{variant} sky did not receive {mode} replacement'
@@ -91,6 +91,28 @@ try:
                     expected_rgb=((expected>>16)&255,(expected>>8)&255,expected&255)
                     assert all(abs(a-b)<=1 for a,b in zip(actual,expected_rgb)),f'{variant} ps{model} {mode}: actual {actual}, expected {expected_rgb}'
                     print('PASS: real SKY pixels',variant,'ps',model,mode,'native-created' if direct else 'wrapper-created',actual)
+
+        # Actual D3DCompile + blended pixels: structure alpha changes, RGB and
+        # unrelated translucent materials remain untouched, on both creation paths.
+        if mode in ('opaque','opaque_off'):
+            names=('dismantling_scale','rongjie_fazhi','rongjiezhi','alpha_intensty','AlphaMtl','diffuse_instensty')
+            source=';'.join('float '+n for n in names)+'; sampler2D sam_other0;'
+            source+='float4 main():COLOR {return float4(.25,.5,.75,.25)+('
+            source+='+'.join(names)+'+tex2D(sam_other0,float2(.5,.5)).x)*0.000001;}'
+            unrelated='float4 main():COLOR {return float4(.25,.5,.75,.25);}'
+            for state,value in [(27,1),(19,5),(20,6)]:
+                check(method(device,57,c.c_long,w.UINT,w.DWORD)(device,state,value))
+            for direct in (False,True):
+                for model in (2,3):
+                    for selected,text in ((False,unrelated),(True,source)):
+                        ps=create(text,f'ps_{model}_0',direct)
+                        pixel=draw(normalVS,ps)
+                        rgb=((pixel>>16)&255,(pixel>>8)&255,pixel&255)
+                        expected=(64,128,191) if selected and mode=='opaque' else (144,45,73)
+                        assert all(abs(a-b)<=2 for a,b in zip(rgb,expected)),(mode,selected,direct,model,rgb,expected)
+                        logical=c.c_void_p();check(method(device,108,c.c_long,c.POINTER(c.c_void_p))(device,c.byref(logical)))
+                        assert logical.value==ps.value;release(logical)
+                        print('PASS: real structure opacity pixels',mode,selected,direct,model,rgb)
 
 finally:
     for shader in shaders:release(shader)

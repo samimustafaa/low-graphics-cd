@@ -27,7 +27,7 @@ class UITests(unittest.TestCase):
             exe.write_bytes(data)
             app.path.set(str(exe)); app.load_selected()
             with patch.object(core, 'require_closed', lambda value: None):
-                app.install(); self.assertIn('1.6.7', app.install_status.get())
+                app.install(); self.assertIn('1.6.10', app.install_status.get())
                 app.select(4); app.apply(); self.assertEqual(core.read_settings(exe.parent)['bias'], 10)
                 app.load_selected(); self.assertEqual(app.profile.get(), 4)
                 app.choose_profile(6); app.flat_ground.set(True); app.apply(); self.assertEqual(core.read_settings(exe.parent)['bias'], 15)
@@ -60,7 +60,9 @@ class UITests(unittest.TestCase):
                 app.choose_profile(4)
                 self.assertIn('Potato Graphics', app.using.get()) # Selection alone is not Apply.
                 app.apply(); self.assertIn('You are using Ultra textures', app.using.get())
-                app.choose_profile(6);app.apply()
+                app.choose_profile(6);app.opaque_structures.set(True);app.apply()
+                self.assertTrue(core.read_settings(exe.parent)['opaque_structures'])
+                app.load_selected();self.assertTrue(app.opaque_structures.get())
                 app.enabled.set(False); app.apply(); self.assertFalse(core.read_settings(exe.parent)['enabled'])
                 app.show('Diagnostics'); root.update()
                 app.passthrough.set(True); app.save_passthrough()
@@ -100,6 +102,11 @@ class UITests(unittest.TestCase):
                     app.run(app.apply)
                 self.assertFalse(app.applied)
                 self.assertNotEqual(app.using_label.cget('fg'),SUCCESS)
+                (exe.parent / core.DLL).write_bytes(core.bundled_helper())
+                (exe.parent / core.INI).write_text(core.MARKER+'\nnot a valid INI file')
+                app.load_selected()
+                self.assertFalse(app.applied)
+                self.assertIn('not verified',app.using.get())
             self.assertEqual(exe.read_bytes(), data)
 
     def test_tray_hide_reveal_and_update_popup(self):

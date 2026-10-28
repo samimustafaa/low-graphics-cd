@@ -113,7 +113,7 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(result, "updated")
         self.assertEqual((self.folder / m.DLL).read_bytes(), b"replacement DLL")
         self.assertEqual(game.read_bytes(), b"game stays original")
-        self.assertEqual(json.loads(manifest.read_text())["build_version"], "1.6.7")
+        self.assertEqual(json.loads(manifest.read_text())["build_version"], "1.6.10")
         self.assertEqual(list(self.folder.glob("TextureLab_recovery_*")), [])
 
     def test_failed_update_rolls_back_dll_settings_and_manifest(self):
@@ -217,6 +217,16 @@ class ManagerTests(unittest.TestCase):
         with patch.object(Path, "open", denied):
             with self.assertRaises(PermissionError): m.install(self.folder, self.dll)
         self.assertEqual(list(self.folder.iterdir()), [game])
+
+    def test_opaque_structures_are_optional_and_potato_only(self):
+        self.assertIn(b'OpaqueStructures=0', m.settings(6))
+        for mode in (0,2,4,6):
+            self.assertIn(f'OpaqueStructures={int(mode==6)}'.encode(), m.settings(mode,opaque_structures=True))
+        m.install(self.folder,self.dll)
+        m.save_preset(self.folder,6,opaque_structures=True)
+        self.assertTrue(m.read_settings(self.folder)['opaque_structures'])
+        m.save_preset(self.folder,4,opaque_structures=True)
+        self.assertFalse(m.read_settings(self.folder)['opaque_structures'])
 
     def test_repair_backs_up_unknown_wrapper_without_deleting_it(self):
         (self.folder / m.DLL).write_bytes(b'unknown wrapper')

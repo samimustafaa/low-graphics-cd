@@ -19,7 +19,7 @@ jobs:
       - name: Native sanitizer tests
         run: |
           mkdir -p native-tests
-          for name in native_callbacks sky_shader ground_shader sky_binding; do
+          for name in native_callbacks sky_shader ground_shader sky_binding structure_shader; do
             g++ -std=c++17 -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -DTEXTURELAB_HOST_TEST -Wno-format tests/test_${name}.cpp -o native-tests/${name}
             ASAN_OPTIONS=detect_leaks=0 native-tests/${name}
           done
@@ -28,7 +28,7 @@ jobs:
           i686-w64-mingw32-g++ -std=c++17 -O2 -Wall -Wextra -Wno-cast-function-type -Wno-misleading-indentation -fno-exceptions -fno-rtti -shared -static -static-libgcc native/texture_lab.cpp native/exports.def -o d3d9.dll -Wl,--no-insert-timestamp -s
           i686-w64-mingw32-g++ -std=c++17 -O2 -Wall -Wextra -Wno-misleading-indentation -municode -mwindows -static -static-libgcc native/updater.cpp -o TextureLab-Updater.exe -lshell32 -lbcrypt -Wl,--no-insert-timestamp -s
           i686-w64-mingw32-g++ -municode -mwindows -static tools/update_fixture.cpp -o native-tests/update_fixture.exe
-          for name in native_callbacks sky_shader ground_shader sky_binding; do
+          for name in native_callbacks sky_shader ground_shader sky_binding structure_shader; do
             i686-w64-mingw32-g++ -std=c++17 -O1 -static tests/test_${name}.cpp -o native-tests/${name}.exe
           done
           python3 -c "import hashlib; from pathlib import Path; Path('DLL_SHA256.txt').write_text(hashlib.sha256(Path('d3d9.dll').read_bytes()).hexdigest()+'  d3d9.dll\n')"
@@ -63,6 +63,8 @@ jobs:
           if ($LASTEXITCODE) { throw 'Ground shader test failed' }
           & .\native-tests\sky_binding.exe
           if ($LASTEXITCODE) { throw 'Sky binding test failed' }
+          & .\native-tests\structure_shader.exe
+          if ($LASTEXITCODE) { throw 'Structure shader test failed' }
       - name: Windows runtime and shader assembler tests
         run: |
           python tools/windows_runtime_test.py

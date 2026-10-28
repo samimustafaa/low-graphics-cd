@@ -201,6 +201,7 @@ class App:
         self.neutral_sky = tk.BooleanVar(value=True)
         self.neutral_sky.trace_add('write',lambda *args:self.paint_sky())
         self.flat_ground = tk.BooleanVar(value=False)
+        self.opaque_structures = tk.BooleanVar(value=False)
         self.allow_mipmaps = tk.BooleanVar(value=True)
         self.applied = False
         self.using = tk.StringVar(value="No preset applied yet.")
@@ -523,6 +524,7 @@ class App:
         self.paint_sky()
         self.option(options,'Stronger close-up textures + sky mipmaps · Potato',self.allow_mipmaps)
         self.option(options,'No grass + flat ground · Potato Graphics',self.flat_ground)
+        self.option(options,'Opaque structures (experimental) · Potato',self.opaque_structures)
         self.apply_button=self.button(lower,'Apply preset  →',lambda:self.run(self.apply),primary=True)
         self.apply_button.pack(side='right',padx=(20,0),anchor='s',pady=5)
         notice=self.card(self.content);notice.pack(fill='x')
@@ -619,7 +621,7 @@ class App:
     def run(self, fn):
         if self.busy: return
         try: fn()
-        except (OSError, ValueError, KeyError) as error:
+        except (OSError, ValueError, KeyError, core.configparser.Error) as error:
             self.status.set(str(error))
             self.applied=False
             self.using.set('Graphics not verified. Resolve the error before launching.')
@@ -649,6 +651,7 @@ class App:
                 self.enabled.set(config['enabled']); self.passthrough.set(config['bypass'])
                 self.neutral_sky.set(config['neutral_sky'] and not config['black_sky'])
                 self.flat_ground.set(config['flat_ground'])
+                self.opaque_structures.set(config['opaque_structures'])
                 self.allow_mipmaps.set(config['allow_mipmaps'])
                 self.collect_stats.set(config['collect_stats'])
                 self.saved_label(self.profile.get(), config['enabled'], config['bypass'])
@@ -661,7 +664,7 @@ class App:
                 if self.route=='Graphics': self.using_label.configure(fg=MUTED)
                 self.status.set('Existing graphics files found. Click Repair installation to back them up first.' if conflict else 'Game selected. Close the game, then click Install / update.')
             if self.route == 'Graphics': self.select(self.profile.get())
-        except (OSError, ValueError, KeyError) as error:
+        except (OSError, ValueError, KeyError, core.configparser.Error) as error:
             self.install_status.set('CHECK / REPAIR NEEDED'); self.status.set(str(error))
             self.applied=False
             self.using.set('Graphics not verified. Check the game path or repair the installation.')
@@ -672,7 +675,7 @@ class App:
         data = core.bundled_helper()
         result = core.install_or_update(exe.parent, data)
         self.load_selected()
-        self.status.set(f'Helper {result} to 1.6.7. Restart the game and test Low first. Native loading and texture changes still need an in-game check.')
+        self.status.set(f'Helper {result} to 1.6.10. Restart the game and test Low first. Native loading and texture changes still need an in-game check.')
 
     def repair(self):
         exe = self.game(); core.require_closed(exe)
@@ -705,17 +708,17 @@ class App:
 
     def apply(self):
         exe = self.game(); core.require_closed(exe)
-        core.save_preset(exe.parent, self.profile.get(), self.enabled.get(), neutral_sky=self.neutral_sky.get(), allow_mipmaps=self.allow_mipmaps.get(), collect_stats=self.collect_stats.get(), black_sky=False, flat_ground=self.flat_ground.get())
+        core.save_preset(exe.parent, self.profile.get(), self.enabled.get(), neutral_sky=self.neutral_sky.get(), allow_mipmaps=self.allow_mipmaps.get(), collect_stats=self.collect_stats.get(), black_sky=False, flat_ground=self.flat_ground.get(), opaque_structures=self.opaque_structures.get())
         self.saved_label(self.profile.get(), self.enabled.get())
         self.passthrough.set(False)
         sky='Gray' if self.enabled.get() and self.profile.get()==6 and self.neutral_sky.get() else 'Normal (blue)'
         ground = (' · Ground: '+('dark flat' if self.neutral_sky.get() else 'natural flat')) if self.enabled.get() and self.profile.get()==6 and self.flat_ground.get() else ''
-        self.status.set('Graphics applied. ' + self.using.get() + '. Sky: '+sky+ground+' · restart the game.')
+        self.status.set('Graphics applied. ' + self.using.get() + '. Sky: '+sky+ground+(' · Opaque structures: experimental' if self.enabled.get() and self.profile.get()==6 and self.opaque_structures.get() else '')+' · restart the game.')
         if self.route=='Graphics': self.status_label.configure(fg=SUCCESS)
 
     def save_passthrough(self):
         exe = self.game(); core.require_closed(exe)
-        core.save_preset(exe.parent, 0 if self.passthrough.get() else self.profile.get(), self.enabled.get(), self.passthrough.get(), neutral_sky=self.neutral_sky.get(), allow_mipmaps=self.allow_mipmaps.get(), collect_stats=self.collect_stats.get(), black_sky=False, flat_ground=self.flat_ground.get())
+        core.save_preset(exe.parent, 0 if self.passthrough.get() else self.profile.get(), self.enabled.get(), self.passthrough.get(), neutral_sky=self.neutral_sky.get(), allow_mipmaps=self.allow_mipmaps.get(), collect_stats=self.collect_stats.get(), black_sky=False, flat_ground=self.flat_ground.get(), opaque_structures=self.opaque_structures.get())
         self.saved_label(self.profile.get(), self.enabled.get(), self.passthrough.get())
         self.status.set('Diagnostic settings saved for the next game launch. Pass-through uses normal graphics when checked.')
 
