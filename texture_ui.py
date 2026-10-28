@@ -441,7 +441,7 @@ class App:
                             border=ACCENT if primary else (PANEL if quiet else LINE))
 
     def card(self,parent):
-        padding=10 if self.compact else 12
+        padding=6 if self.compact else 8
         frame=tk.Frame(parent,bg=CARD,padx=16,pady=padding)
         canvas=tk.Canvas(frame,bg=parent.cget('bg'),highlightthickness=0,bd=0)
         canvas.place(x=-16,y=-padding,relwidth=1,relheight=1,width=32,height=padding*2)
