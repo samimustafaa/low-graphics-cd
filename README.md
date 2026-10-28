@@ -22,6 +22,8 @@ Lower graphics for Creative Destruction, made for low-end PCs and laptops.
 
 **Close the game before changing settings.** After an app update, click **Install / update** again to update the game helper too.
 
+If installation reports an existing or changed DLL, use **Repair installation**. It asks first and keeps the previous files in a backup folder with undo instructions.
+
 To undo the changes, close the game and click **Restore original** before uninstalling sg0hann BOOST. Right-click the tray icon and choose **Exit** to fully close the app.
 
 ## A few things to know

@@ -226,7 +226,7 @@ class App:
         self.route = 'Graphics'
         self.font = 'Segoe UI' if 'Segoe UI' in tkfont.families(root) else 'Helvetica'
         self.wrapped_labels = []
-        root.title('sg0hann BOOST 1.6.9')
+        root.title('sg0hann BOOST 1.6.10')
         scale = float(root.tk.call('tk', 'scaling')) / (96 / 72)
         root.withdraw()
         self.work_area = monitor_work_area(root)
@@ -262,7 +262,7 @@ class App:
         for name in ('Graphics', 'Diagnostics', 'About'):
             self.nav[name] = self.button(self.sidebar, name, lambda n=name: self.show(n), quiet=True)
             self.nav[name].pack(side='left', padx=5, pady=12)
-        self.label(self.sidebar, 'v1.6.9', 9, MUTED).pack(side='right', padx=28)
+        self.label(self.sidebar, 'v1.6.10', 9, MUTED).pack(side='right', padx=28)
         body = tk.Frame(root, bg=BG)
         body.pack(fill='both', expand=True)
         self.update_banner = self.label(body,'New update - update the app now',9,SUCCESS,True,anchor='center',cursor='hand2')
@@ -373,7 +373,7 @@ class App:
             return
         self.update_busy = True
         def worker():
-            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.9'), manual)))
+            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.10'), manual)))
             except Exception as error: self.jobs.put(('update_error', (str(error), manual)))
         threading.Thread(target=worker, daemon=True).start()
 
@@ -492,6 +492,7 @@ class App:
         install=self.button(actions,'Install / update',lambda:self.run(self.install))
         install.set_palette('#d5d6dc',BG,hover='#ebebef',border='#d5d6dc');install.pack(side='left')
         self.button(actions,'Restore original',lambda:self.run(self.remove),danger=True).pack(side='left',padx=10)
+        self.button(actions,'Repair installation',lambda:self.run(self.repair)).pack(side='left')
         quality=self.card(self.content);quality.pack(fill='x',pady=(0,6))
         header=tk.Frame(quality,bg=CARD);header.pack(fill='x')
         left=tk.Frame(header,bg=CARD);left.pack(side='left')
@@ -620,7 +621,11 @@ class App:
         try: fn()
         except (OSError, ValueError, KeyError) as error:
             self.status.set(str(error))
-            if self.route=='Graphics': self.status_label.configure(fg=DANGER)
+            self.applied=False
+            self.using.set('Graphics not verified. Resolve the error before launching.')
+            if self.route=='Graphics':
+                self.status_label.configure(fg=DANGER)
+                self.using_label.configure(fg=DANGER)
             messagebox.showerror('sg0hann BOOST',str(error),parent=self.root)
 
     def load_selected(self):
@@ -632,6 +637,11 @@ class App:
                 path.write_text(json.dumps({'game': str(exe)}), encoding='utf-8')
             if (exe.parent / core.MANIFEST).exists():
                 record = core.owned_manifest(exe.parent)
+                snapshot = core.installation_snapshot(exe.parent)
+                if snapshot[core.DLL] != record['dll_sha256'] or snapshot[core.INI] is None:
+                    raise core.InstallationConflict('Graphics helper is missing or changed. Click Repair installation.')
+                if not (exe.parent / core.INI).read_text(encoding='ascii').startswith(core.MARKER+'\n'):
+                    raise core.InstallationConflict('Settings cannot be verified. Click Repair installation.')
                 self.install_status.set('INSTALLED  ' + record.get('build_version', 'older'))
                 config = core.read_settings(exe.parent)
                 mode = core.preset_from_settings(config)
@@ -644,23 +654,46 @@ class App:
                 self.saved_label(self.profile.get(), config['enabled'], config['bypass'])
                 self.status.set('Game selected. Install / update replaces older helper versions; close the game first.')
             else:
-                self.install_status.set('READY TO INSTALL')
+                conflict=any(core.installation_snapshot(exe.parent).values())
+                self.install_status.set('REPAIR NEEDED' if conflict else 'READY TO INSTALL')
                 self.applied=False
                 self.using.set('No preset applied yet.')
                 if self.route=='Graphics': self.using_label.configure(fg=MUTED)
-                self.status.set('Game selected. Close the game, then click Install / update.')
+                self.status.set('Existing graphics files found. Click Repair installation to back them up first.' if conflict else 'Game selected. Close the game, then click Install / update.')
             if self.route == 'Graphics': self.select(self.profile.get())
         except (OSError, ValueError, KeyError) as error:
-            self.install_status.set('CHECK GAME PATH'); self.status.set(str(error))
+            self.install_status.set('CHECK / REPAIR NEEDED'); self.status.set(str(error))
+            self.applied=False
+            self.using.set('Graphics not verified. Check the game path or repair the installation.')
+            if self.route=='Graphics': self.using_label.configure(fg=DANGER)
 
     def install(self):
         exe = self.game(); core.require_closed(exe)
-        data = (core.ROOT / core.DLL).read_bytes()
-        expected = (core.ROOT / 'DLL_SHA256.txt').read_text().split()[0]
-        if core.sha(data) != expected: raise ValueError('The bundled DLL differs from its recorded hash. Extract a fresh package.')
+        data = core.bundled_helper()
         result = core.install_or_update(exe.parent, data)
         self.load_selected()
         self.status.set(f'Helper {result} to 1.6.7. Restart the game and test Low first. Native loading and texture changes still need an in-game check.')
+
+    def repair(self):
+        exe = self.game(); core.require_closed(exe)
+        data = core.bundled_helper()
+        snapshot = core.installation_snapshot(exe.parent)
+        present = ', '.join(name for name, digest in snapshot.items() if digest is not None) or 'No existing helper files'
+        if not messagebox.askyesno('Repair BOOST installation',
+                f'Game folder: {exe.parent}\n\nExisting files: {present}\n\n'
+                'Repair moves these files into a BOOST_backup_ folder inside the game folder, '
+                'then installs a verified BOOST helper. Valid BOOST settings are kept; otherwise Low is used.\n\n'
+                'An existing DLL may belong to the game or another graphics tool. That tool will no longer '
+                'be active. The backup includes instructions to undo this repair.\n\n'
+                'Keep the game closed. Back up these files and repair now?', parent=self.root):
+            return
+        core.require_closed(exe)
+        backup = core.repair_installation(exe.parent, data, snapshot)
+        self.load_selected()
+        self.status.set(f'Installation repaired. Previous files kept at {backup}. Restart the game and test Low first.')
+        messagebox.showinfo('Repair complete', f'BOOST helper repaired.\n\nBackup: {backup}\n\n'
+                            'Keep this folder. RESTORE.txt explains how to undo the repair.\n'
+                            'If the helper disappears again, check antivirus Protection history.', parent=self.root)
 
     def remove(self):
         exe = self.game(); core.require_closed(exe); core.uninstall(exe.parent)

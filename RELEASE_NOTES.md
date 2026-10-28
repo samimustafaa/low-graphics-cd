@@ -1,8 +1,10 @@
-# sg0hann BOOST 1.6.9
+# sg0hann BOOST 1.6.10
 
-- The public app name is now **sg0hann BOOST**, including the installer, shortcuts, tray, taskbar display name, and EXE metadata.
-- Download **sg0hann-BOOST-Setup-1.6.9.exe** to install the app. Uploaded files now show the sg0hann BOOST brand.
-- The portable archive is **sg0hann-BOOST-Portable-1.6.9.zip**.
-- Automatic updates prefer the branded installer. Old TextureLab asset names remain as compatibility copies so existing users can still update.
+- Added **Repair installation** for existing d3d9.dll conflicts, missing helpers, damaged records, and changed helpers.
+- Repair asks first, keeps the previous files in a BOOST_backup_ folder, and includes undo instructions. Valid BOOST settings are preserved. Failed repairs roll back when possible and retain recovery copies if rollback is blocked.
+- Game selection now checks helper integrity before displaying an applied preset. Failed operations no longer leave a green success claim.
+- Missing or damaged bundled components now show reinstall and antivirus-history guidance.
 
-Graphics settings, recovery backups, and the 1.6.7 game helper are unchanged. Scan status and checksums are included.
+Graphics rendering is unchanged: the game helper remains 1.6.7. Opaque structure materials are not included in this release; they require the matching game shader/material files. No FPS gain or antivirus clearance is guaranteed.
+
+Download **sg0hann-BOOST-Setup-1.6.10.exe** or **sg0hann-BOOST-Portable-1.6.10.zip**. Scan results and checksums are included.

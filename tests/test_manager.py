@@ -218,6 +218,91 @@ class ManagerTests(unittest.TestCase):
             with self.assertRaises(PermissionError): m.install(self.folder, self.dll)
         self.assertEqual(list(self.folder.iterdir()), [game])
 
+    def test_repair_backs_up_unknown_wrapper_without_deleting_it(self):
+        (self.folder / m.DLL).write_bytes(b'unknown wrapper')
+        game = self.folder / 'game.dat'; game.write_bytes(b'original game')
+        backup = m.repair_installation(self.folder, self.dll, m.installation_snapshot(self.folder))
+        self.assertEqual((backup / m.DLL).read_bytes(), b'unknown wrapper')
+        self.assertTrue((backup / 'RESTORE.txt').is_file())
+        self.assertEqual((self.folder / m.DLL).read_bytes(), self.dll)
+        self.assertEqual(game.read_bytes(), b'original game')
+        m.uninstall(self.folder)
+        self.assertTrue((backup / m.DLL).is_file())
+
+    def test_repair_missing_or_changed_dll_preserves_owned_settings(self):
+        for missing in (True, False):
+            with self.subTest(missing=missing):
+                m.install(self.folder, self.dll)
+                m.save_preset(self.folder, 6, flat_ground=True)
+                before = (self.folder / m.INI).read_bytes()
+                if missing: (self.folder / m.DLL).unlink()
+                else: (self.folder / m.DLL).write_bytes(b'changed')
+                backup=m.repair_installation(self.folder, self.dll, m.installation_snapshot(self.folder))
+                self.assertEqual((self.folder / m.INI).read_bytes(), before)
+                self.assertEqual((backup / m.INI).read_bytes(), before)
+                self.assertEqual((self.folder / m.DLL).read_bytes(), self.dll)
+                m.uninstall(self.folder)
+
+    def test_repair_invalid_record_and_foreign_settings_uses_low(self):
+        (self.folder / m.MANIFEST).write_bytes(b'corrupt record')
+        (self.folder / m.INI).write_bytes(b'foreign config')
+        backup=m.repair_installation(self.folder, self.dll, m.installation_snapshot(self.folder))
+        self.assertEqual((backup / m.MANIFEST).read_bytes(), b'corrupt record')
+        self.assertEqual((backup / m.INI).read_bytes(), b'foreign config')
+        self.assertEqual(m.preset_from_settings(m.read_settings(self.folder)), 2)
+
+    def test_repair_requires_unchanged_reviewed_files(self):
+        snapshot=m.installation_snapshot(self.folder)
+        (self.folder / m.DLL).write_bytes(b'new tool appeared')
+        with self.assertRaisesRegex(ValueError, 'changed while repair'):
+            m.repair_installation(self.folder, self.dll, snapshot)
+        self.assertEqual((self.folder / m.DLL).read_bytes(), b'new tool appeared')
+        self.assertEqual(list(self.folder.glob('BOOST_backup_*')), [])
+
+    def test_repair_rejects_redirected_files(self):
+        target=self.folder / 'untouched'; target.write_bytes(b'original')
+        (self.folder / m.DLL).symlink_to(target)
+        with self.assertRaisesRegex(ValueError,'redirected'):
+            m.installation_snapshot(self.folder)
+        self.assertEqual(target.read_bytes(), b'original')
+
+    def test_repair_install_failure_restores_all_original_bytes(self):
+        m.install(self.folder, self.dll)
+        before={p.name:p.read_bytes() for p in self.folder.iterdir()}
+        real_install=m.install
+        def partial(folder,data):
+            # Exercise the actual partial-install rollback before repair rollback.
+            original_open=Path.open
+            def denied(path,*args,**kwargs):
+                if path.name == m.INI and args and args[0]=='xb': raise PermissionError('locked INI')
+                return original_open(path,*args,**kwargs)
+            with patch.object(Path,'open',denied): real_install(folder,data)
+        with patch.object(m,'install',partial):
+            with self.assertRaises(PermissionError):
+                m.repair_installation(self.folder,b'new DLL',m.installation_snapshot(self.folder))
+        self.assertEqual(before,{p.name:p.read_bytes() for p in self.folder.iterdir()})
+
+    def test_repair_locked_original_does_not_remove_owned_files(self):
+        m.install(self.folder, self.dll)
+        before={p.name:p.read_bytes() for p in self.folder.iterdir()}
+        with patch.object(Path,'rename',side_effect=PermissionError('locked DLL')):
+            with self.assertRaises(PermissionError):
+                m.repair_installation(self.folder,self.dll,m.installation_snapshot(self.folder))
+        self.assertEqual(before,{p.name:p.read_bytes() for p in self.folder.iterdir()})
+
+    def test_repair_failed_settings_write_rolls_back(self):
+        m.install(self.folder, self.dll)
+        before={p.name:p.read_bytes() for p in self.folder.iterdir()}
+        with patch.object(m,'_atomic_write',side_effect=PermissionError('cannot save settings')):
+            with self.assertRaises(PermissionError):
+                m.repair_installation(self.folder,b'new DLL',m.installation_snapshot(self.folder))
+        self.assertEqual(before,{p.name:p.read_bytes() for p in self.folder.iterdir()})
+
+    def test_missing_bundle_explains_reinstall_without_touching_game(self):
+        with patch.object(m,'ROOT',self.folder):
+            with self.assertRaisesRegex(ValueError,'missing its bundled graphics component'): m.bundled_helper()
+        self.assertEqual(list(self.folder.iterdir()), [])
+
     def test_rejects_64bit_executable(self):
         data = bytearray(160)
         data[:2] = b"MZ"; struct.pack_into("<I", data, 0x3c, 64)

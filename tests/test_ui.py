@@ -18,7 +18,7 @@ class UITests(unittest.TestCase):
         except tk.TclError: self.skipTest('No display available')
         app = App(root, remember=False)
         self.addCleanup(app.close)
-        self.assertEqual(root.title(), "sg0hann BOOST 1.6.9")
+        self.assertEqual(root.title(), "sg0hann BOOST 1.6.10")
         with tempfile.TemporaryDirectory() as temp:
             exe = Path(temp) / 'client.exe'
             data = bytearray(160); data[:2] = b'MZ'
@@ -78,6 +78,28 @@ class UITests(unittest.TestCase):
                 with patch.object(core, 'require_closed', side_effect=ValueError('game running')):
                     with self.assertRaisesRegex(ValueError, 'game running'): app.apply()
                 app.remove(); self.assertFalse((exe.parent / core.DLL).exists())
+                # Reproduce the orphan DLL and changed DLL reports with a real
+                # fake-game directory, including cancel, backup, and rechecking.
+                (exe.parent / core.DLL).write_bytes(b'other graphics wrapper')
+                app.load_selected()
+                self.assertEqual(app.install_status.get(),'REPAIR NEEDED')
+                with patch('texture_ui.messagebox.askyesno',return_value=False):
+                    app.repair()
+                self.assertEqual((exe.parent / core.DLL).read_bytes(),b'other graphics wrapper')
+                with patch('texture_ui.messagebox.askyesno',return_value=True), patch('texture_ui.messagebox.showinfo'):
+                    app.repair()
+                backups=list(exe.parent.glob('BOOST_backup_*'))
+                self.assertEqual(len(backups),1)
+                self.assertEqual((backups[0] / core.DLL).read_bytes(),b'other graphics wrapper')
+                app.apply()
+                (exe.parent / core.DLL).write_bytes(b'modified helper')
+                app.load_selected()
+                self.assertFalse(app.applied)
+                self.assertIn('not verified',app.using.get())
+                with patch('texture_ui.messagebox.showerror'):
+                    app.run(app.apply)
+                self.assertFalse(app.applied)
+                self.assertNotEqual(app.using_label.cget('fg'),SUCCESS)
             self.assertEqual(exe.read_bytes(), data)
 
     def test_tray_hide_reveal_and_update_popup(self):
@@ -90,7 +112,7 @@ class UITests(unittest.TestCase):
         app.reveal(); self.assertFalse(app.hidden); root.update()
         with patch('texture_ui.messagebox.askyesno',return_value=False) as popup:
             from update_manager import Release
-            r=Release('1.6.9','file','',1,'','')
+            r=Release('1.6.10','file','',1,'','')
             app.offer_update(r,False); popup.assert_called_once()
             root.update()
             self.assertTrue(app.update_banner.winfo_ismapped())

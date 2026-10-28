@@ -30,6 +30,107 @@ PRESETS = {
 }
 
 
+class InstallationConflict(ValueError):
+    """An explicit, backed-up repair is needed before changing game files."""
+
+
+def bundled_helper():
+    """Verify the packaged component before touching the game folder."""
+    try:
+        data = (ROOT / DLL).read_bytes()
+        expected = (ROOT / 'DLL_SHA256.txt').read_text().split()[0]
+    except (OSError, IndexError) as exc:
+        raise ValueError('BOOST is missing its bundled graphics component. Exit BOOST and reinstall '
+                         'the official installer. Check antivirus Protection history if it disappears '
+                         'again; do not disable protection or download a replacement DLL.') from exc
+    if sha(data) != expected:
+        raise ValueError('BOOST\'s bundled graphics component failed verification. '
+                         'Reinstall the official installer before changing game files.')
+    return data
+
+
+def installation_snapshot(folder):
+    """Fixed filenames only; also used to detect changes after a repair prompt."""
+    folder = Path(folder)
+    result = {}
+    for name in (DLL, INI, MANIFEST):
+        path = folder / name
+        if path.is_symlink() or (path.exists() and not path.is_file()):
+            raise ValueError(f'{name} is redirected or is not a regular file. Nothing was changed.')
+        result[name] = sha(path.read_bytes()) if path.exists() else None
+    return result
+
+
+def repair_installation(folder, dll_bytes, expected_snapshot):
+    """Explicit repair: retain all previous bytes, roll back a failed fresh install.
+
+    The caller must show the fixed file list/backup policy and require the game
+    to be closed again after confirmation. Unknown DLLs are never auto-adopted.
+    """
+    folder = Path(folder)
+    if installation_snapshot(folder) != expected_snapshot:
+        raise ValueError('Game files changed while repair was open. Review the installation again.')
+    # Preserve valid owned settings even if the DLL/record is missing or changed.
+    ini = folder / INI
+    settings_data = None
+    if ini.is_file():
+        try:
+            raw = ini.read_bytes()
+            if raw.decode('ascii').startswith(MARKER + '\n'):
+                preset_from_settings(read_settings(folder))
+                settings_data = raw
+        except (UnicodeError, ValueError, configparser.Error):
+            pass
+    backup = Path(tempfile.mkdtemp(prefix='BOOST_backup_', dir=folder))
+    moved = []
+    installed = False
+    try:
+        for name, digest in expected_snapshot.items():
+            if digest is None:
+                continue
+            path = folder / name
+            if path.is_symlink() or sha(path.read_bytes()) != digest:
+                raise ValueError('Game files changed during repair. Please try again.')
+            path.rename(backup / name)
+            moved.append(name)
+            if sha((backup / name).read_bytes()) != digest:
+                raise ValueError('Game files changed during repair. Please try again.')
+        install(folder, dll_bytes)
+        installed = True
+        if settings_data is not None:
+            _atomic_write(folder / INI, settings_data)
+    except Exception as exc:
+        # Remove only files that this repair demonstrably installed, then restore
+        # originals. If a foreign file appears, retain the backup and stop.
+        if installed:
+            try:
+                uninstall(folder)
+            except (OSError, ValueError, KeyError):
+                pass
+        errors = []
+        for name in reversed(moved):
+            try:
+                target = folder / name
+                if target.exists() or target.is_symlink():
+                    raise OSError(f'{name} now exists; retained its original backup')
+                (backup / name).rename(target)
+            except OSError as error:
+                errors.append(str(error))
+        if errors:
+            raise OSError(f'Repair stopped. Original files are kept at {backup}. '
+                          'Close the game before recovery. ' + '; '.join(errors)) from exc
+        backup.rmdir()
+        raise
+    (backup / 'RESTORE.txt').write_text(
+        'BOOST repair backup. Keep this folder.\n'
+        'To return to the previous installation: close the game, use BOOST Restore original,\n'
+        'then copy the backed-up d3d9.dll, CD_TextureLab.ini and CD_TextureLab_install.json\n'
+        'that exist here into the game folder. Do not copy RESTORE.txt.\n'
+        'These saved files may belong to another graphics tool; BOOST did not verify their origin.\n',
+        encoding='utf-8')
+    return backup
+
+
 def sha(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -88,7 +189,7 @@ def owned_manifest(folder):
     if (folder / MANIFEST).is_symlink():
         raise ValueError("Refusing a redirected installation record.")
     value = json.loads((folder / MANIFEST).read_text(encoding="utf-8"))
-    if value.get("app") != APP or not isinstance(value.get("dll_sha256"), str):
+    if not isinstance(value, dict) or value.get("app") != APP or not isinstance(value.get("dll_sha256"), str):
         raise ValueError("This installation does not have a valid Texture Lab record.")
     return value
 
@@ -99,8 +200,8 @@ def install(folder, dll_bytes):
     targets = [folder / n for n in (DLL, INI, MANIFEST)]
     for p in targets:
         if p.exists() or p.is_symlink():
-            raise ValueError(f"{p.name} already exists. Nothing was overwritten. "
-                             "Remove an existing Texture Lab installation first; keep other graphics wrappers separate.")
+            raise InstallationConflict(f"{p.name} already exists. Nothing was overwritten. "
+                                       "Click Repair installation to back up the existing files and install BOOST.")
     created = []
     blobs = [dll_bytes, settings(), json.dumps({"app": APP, "build_version": "1.6.7", "dll_sha256": sha(dll_bytes)}, indent=2).encode()]
     try:
@@ -116,7 +217,10 @@ def install(folder, dll_bytes):
 
 def apply_bias(folder, bias, bypass=False):
     folder = Path(folder)
-    record = owned_manifest(folder)
+    try:
+        record = owned_manifest(folder)
+    except (OSError, ValueError) as exc:
+        raise InstallationConflict('The installation record cannot be verified. Click Repair installation.') from exc
     if bypass and record.get("build_version") != "1.6.7":
         raise ValueError("Install/update the 1.6.7 helper before using Bypass. Restart the game afterward.")
     ini = folder / INI
@@ -191,13 +295,16 @@ def install_or_update(folder, dll_bytes):
     if not (folder / MANIFEST).exists():
         install(folder, dll_bytes)
         return "installed"
-    record = owned_manifest(folder)
+    try:
+        record = owned_manifest(folder)
+    except (OSError, ValueError) as exc:
+        raise InstallationConflict('The installation record cannot be verified. Click Repair installation.') from exc
     dll = folder / DLL
     if dll.is_symlink() or not dll.is_file() or sha(dll.read_bytes()) != record["dll_sha256"]:
-        raise ValueError("The installed DLL changed or is missing. Use recovery before updating.")
+        raise InstallationConflict("The installed DLL changed or is missing. Click Repair installation to back up and repair it.")
     ini = folder / INI
     if ini.is_symlink() or not ini.is_file() or not ini.read_text(encoding="ascii").startswith(MARKER + "\n"):
-        raise ValueError("Settings ownership cannot be verified. Nothing was updated.")
+        raise InstallationConflict("Settings ownership cannot be verified. Click Repair installation. Nothing was updated.")
     backup = Path(tempfile.mkdtemp(prefix="TextureLab_recovery_", dir=folder))
     names = (DLL, INI, MANIFEST)
     for name in names:
