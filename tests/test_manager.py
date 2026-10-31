@@ -30,7 +30,7 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(config.read_bytes(), b"original compiled game config")
         self.assertEqual(list(self.folder.iterdir()), [config])
 
-    def test_only_potato_allows_optional_mip_filter(self):
+    def test_default_ultra_keeps_original_mip_filter(self):
         m.install(self.folder, self.dll)
         for mode, expected in [(6, ("32", "4", "0", "1")),
                                (4, ("128", "0", "0", "0")),
@@ -59,7 +59,7 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(m.preset_from_settings({'bias': 4, 'size': 256}), 4)
         self.assertEqual(m.preset_from_settings({'bias': 4, 'size': 64}), 6)
 
-    def test_neutral_sky_only_on_potato_and_can_be_disabled(self):
+    def test_legacy_neutral_sky_defaults_and_explicit_switch(self):
         for mode in (0,2,4,6):
             data = m.settings(mode)
             self.assertIn(f"NeutralSky={int(mode == 6)}".encode(), data)
@@ -85,10 +85,10 @@ class ManagerTests(unittest.TestCase):
         m.install_or_update(self.folder, self.dll + b'new')
         self.assertEqual((self.folder / m.INI).read_bytes(), before)
 
-    def test_flat_ground_is_optional_potato_only_and_roundtrips(self):
+    def test_flat_ground_is_optional_ultra_or_legacy_and_roundtrips(self):
         self.assertIn(b"FlatGround=0", m.settings(6))
         for mode in (0,2,4,6):
-            self.assertIn(f"FlatGround={int(mode == 6)}".encode(),m.settings(mode, flat_ground=True))
+            self.assertIn(f"FlatGround={int(mode in (4,6))}".encode(),m.settings(mode, flat_ground=True))
         m.install(self.folder,self.dll)
         m.save_preset(self.folder,6,flat_ground=True)
         self.assertTrue(m.read_settings(self.folder)['flat_ground'])
@@ -218,15 +218,30 @@ class ManagerTests(unittest.TestCase):
             with self.assertRaises(PermissionError): m.install(self.folder, self.dll)
         self.assertEqual(list(self.folder.iterdir()), [game])
 
-    def test_opaque_structures_are_optional_and_potato_only(self):
+    def test_opaque_structures_are_optional_ultra_or_legacy(self):
         self.assertIn(b'OpaqueStructures=0', m.settings(6))
         for mode in (0,2,4,6):
-            self.assertIn(f'OpaqueStructures={int(mode==6)}'.encode(), m.settings(mode,opaque_structures=True))
+            self.assertIn(f'OpaqueStructures={int(mode in (4,6))}'.encode(), m.settings(mode,opaque_structures=True))
         m.install(self.folder,self.dll)
         m.save_preset(self.folder,6,opaque_structures=True)
         self.assertTrue(m.read_settings(self.folder)['opaque_structures'])
-        m.save_preset(self.folder,4,opaque_structures=True)
+        m.save_preset(self.folder,2,opaque_structures=True)
         self.assertFalse(m.read_settings(self.folder)['opaque_structures'])
+
+    def test_ultra_preserves_base_textures_and_retains_each_extra_option(self):
+        for mode in (0,2,4):
+            parser=configparser.ConfigParser()
+            parser.read_string(m.settings(mode,neutral_sky=True,allow_mipmaps=True,flat_ground=True,opaque_structures=True).decode())
+            cfg=parser['TextureLab'];active=str(int(mode==4))
+            for key in ('NeutralSky','FlatGround','OpaqueStructures','ForceMipFilter','IncludeAutogen'):
+                self.assertEqual(cfg[key],active,(mode,key))
+            if mode==4:
+                self.assertEqual(cfg['Bias'],'10')
+                self.assertEqual(cfg['MinTextureSize'],'128')
+                self.assertEqual(cfg['MinMipLevel'],'4')
+        defaults=m.settings(4)
+        self.assertIn(b'NeutralSky=0',defaults)
+        self.assertIn(b'ForceMipFilter=0',defaults)
 
     def test_repair_backs_up_unknown_wrapper_without_deleting_it(self):
         (self.folder / m.DLL).write_bytes(b'unknown wrapper')

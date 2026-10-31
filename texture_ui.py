@@ -25,9 +25,8 @@ YOUTUBE_URL = 'https://www.youtube.com/@sg0hann'
 SUCCESS = '#6ddd9b'
 DANGER = '#ff6464'
 PROFILES = [(0, 'Normal', 'Original texture detail and sky.'),
-            (2, 'Low', 'The former Potato setting: a lighter reduction.'),
-            (4, 'Ultra', 'Your existing Ultra look, unchanged.'),
-            (6, 'Potato Graphics', 'Maximum texture reduction, more object coverage, optional gray sky.')]
+            (2, 'Low', 'A lighter texture reduction.'),
+            (4, 'Ultra', 'Strong texture reduction, with optional sky and graphics controls.')]
 
 class MotionButton(tk.Canvas):
     """Rounded native-canvas control with event-driven fades and keyboard support."""
@@ -129,7 +128,7 @@ class PresetButton(MotionButton):
         w,h = self.winfo_width(),self.winfo_height()
         color = self.foreground
         x,y = 24,h/2
-        if self.text=='Potato Graphics':
+        if self.text=='Ultra':
             self.create_line(x,y-14,x+12,y-7,x+12,y+7,x,y+14,x-12,y+7,x-12,y-7,x,y-14,fill=color,width=1.5)
             self.create_line(x-12,y-7,x,y,x+12,y-7,fill=color,width=1.5)
             self.create_line(x,y,x,y+14,fill=color,width=1.5)
@@ -198,11 +197,11 @@ class App:
         self.root, self.remember = root, remember
         self.path = tk.StringVar()
         self.profile = tk.IntVar(value=2)
-        self.neutral_sky = tk.BooleanVar(value=True)
+        self.neutral_sky = tk.BooleanVar(value=False)
         self.neutral_sky.trace_add('write',lambda *args:self.paint_sky())
         self.flat_ground = tk.BooleanVar(value=False)
         self.opaque_structures = tk.BooleanVar(value=False)
-        self.allow_mipmaps = tk.BooleanVar(value=True)
+        self.allow_mipmaps = tk.BooleanVar(value=False)
         self.applied = False
         self.using = tk.StringVar(value="No preset applied yet.")
         self.enabled = tk.BooleanVar(value=True)
@@ -227,7 +226,7 @@ class App:
         self.route = 'Graphics'
         self.font = 'Segoe UI' if 'Segoe UI' in tkfont.families(root) else 'Helvetica'
         self.wrapped_labels = []
-        root.title('sg0hann BOOST 1.6.10')
+        root.title('sg0hann BOOST 1.6.11')
         scale = float(root.tk.call('tk', 'scaling')) / (96 / 72)
         root.withdraw()
         self.work_area = monitor_work_area(root)
@@ -263,7 +262,7 @@ class App:
         for name in ('Graphics', 'Diagnostics', 'About'):
             self.nav[name] = self.button(self.sidebar, name, lambda n=name: self.show(n), quiet=True)
             self.nav[name].pack(side='left', padx=5, pady=12)
-        self.label(self.sidebar, 'v1.6.10', 9, MUTED).pack(side='right', padx=28)
+        self.label(self.sidebar, 'v1.6.11', 9, MUTED).pack(side='right', padx=28)
         body = tk.Frame(root, bg=BG)
         body.pack(fill='both', expand=True)
         self.update_banner = self.label(body,'New update - update the app now',9,SUCCESS,True,anchor='center',cursor='hand2')
@@ -374,7 +373,7 @@ class App:
             return
         self.update_busy = True
         def worker():
-            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.10'), manual)))
+            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.11'), manual)))
             except Exception as error: self.jobs.put(('update_error', (str(error), manual)))
         threading.Thread(target=worker, daemon=True).start()
 
@@ -502,7 +501,7 @@ class App:
         Switch(header,self.enabled).pack(side='right')
         presets=tk.Frame(quality,bg=CARD);presets.pack(fill='x',pady=(8,6))
         self.profile_buttons={}
-        subtitles=['Default textures','Reduced detail','Strong reduction','Least texture detail']
+        subtitles=['Default textures','Reduced detail','Strong reduction']
         for i,(value,name,description) in enumerate(PROFILES):
             presets.columnconfigure(i,weight=1,uniform='profiles')
             button=PresetButton(presets,name,subtitles[i],lambda n=value:self.choose_profile(n),(self.font,9,'bold'))
@@ -513,7 +512,7 @@ class App:
         lower=tk.Frame(quality,bg=CARD);lower.pack(fill='x')
         options=tk.Frame(lower,bg=CARD);options.pack(side='left',fill='x',expand=True)
         skyrow=tk.Frame(options,bg=CARD);skyrow.pack(fill='x',pady=2)
-        self.label(skyrow,'Sky · Potato Graphics',9,MUTED,anchor='w').pack(side='left',fill='x',expand=True)
+        self.label(skyrow,'Sky · Ultra',9,MUTED,anchor='w').pack(side='left',fill='x',expand=True)
         self.sky_buttons={}
         for name, value in [('Normal (blue)','normal'),('Sky Gray','gray')]:
             button=MotionButton(skyrow,name,lambda mode=value:self.choose_sky(mode),
@@ -522,9 +521,9 @@ class App:
             button.pack(side='left',padx=3)
             self.sky_buttons[value]=button
         self.paint_sky()
-        self.option(options,'Stronger close-up textures + sky mipmaps · Potato',self.allow_mipmaps)
-        self.option(options,'No grass + flat ground · Potato Graphics',self.flat_ground)
-        self.option(options,'Opaque structures (experimental) · Potato',self.opaque_structures)
+        self.option(options,'Stronger close-up textures + sky mipmaps · Ultra',self.allow_mipmaps)
+        self.option(options,'No grass + flat ground · Ultra',self.flat_ground)
+        self.option(options,'Opaque structures (experimental) · Ultra',self.opaque_structures)
         self.apply_button=self.button(lower,'Apply preset  →',lambda:self.run(self.apply),primary=True)
         self.apply_button.pack(side='right',padx=(20,0),anchor='s',pady=5)
         notice=self.card(self.content);notice.pack(fill='x')
@@ -535,6 +534,7 @@ class App:
         self.label(self.content,'FPS and frame-time gains depend on your hardware and game scene.',8,MUTED).pack(anchor='w',pady=(8,0))
 
     def select(self, mode):
+        if mode == 6: mode = 4  # Migrate a legacy saved selection; never expose a fourth preset.
         self.profile.set(mode)
         if self.route != 'Graphics': return
         for value, button in self.profile_buttons.items():
@@ -546,7 +546,7 @@ class App:
 
     def paint_sky(self):
         if getattr(self,'route',None)!='Graphics': return
-        active=self.profile.get()==6 and self.neutral_sky.get() and self.enabled.get()
+        active=self.profile.get()==4 and self.neutral_sky.get() and self.enabled.get()
         chosen='gray' if active else 'normal'
         for mode,button in getattr(self,'sky_buttons',{}).items():
             if not button.winfo_exists(): continue
@@ -558,8 +558,8 @@ class App:
 
     def choose_sky(self, mode):
         if mode not in ('normal','gray'): raise ValueError('Choose Normal or Sky Gray.')
-        if mode!='normal' and self.profile.get()!=6:
-            self.status.set('Sky colors require Potato Graphics. Choose that preset, then Apply.')
+        if mode!='normal' and self.profile.get()!=4:
+            self.status.set('Sky colors require Ultra. Choose that preset, then Apply.')
             return
         if mode!='normal' and not self.enabled.get():
             self.status.set('Turn Texture changes on to use a sky color, then Apply.')
@@ -569,8 +569,7 @@ class App:
         self.status.set(name+' selected. Click Apply preset with the game closed, then relaunch.')
 
     def choose_profile(self, mode):
-        if mode == 6:
-            self.allow_mipmaps.set(True)
+        if mode not in (0, 2, 4): raise ValueError('Choose Normal, Low, or Ultra.')
         self.select(mode)
 
     def saved_label(self, mode, enabled=True, bypass=False):
@@ -647,15 +646,21 @@ class App:
                 self.install_status.set('INSTALLED  ' + record.get('build_version', 'older'))
                 config = core.read_settings(exe.parent)
                 mode = core.preset_from_settings(config)
-                self.profile.set(mode if mode in core.PRESETS else 2)
+                self.profile.set(4 if mode == 6 else (mode if mode in (0, 2, 4) else 2))
                 self.enabled.set(config['enabled']); self.passthrough.set(config['bypass'])
                 self.neutral_sky.set(config['neutral_sky'] and not config['black_sky'])
                 self.flat_ground.set(config['flat_ground'])
                 self.opaque_structures.set(config['opaque_structures'])
                 self.allow_mipmaps.set(config['allow_mipmaps'])
                 self.collect_stats.set(config['collect_stats'])
-                self.saved_label(self.profile.get(), config['enabled'], config['bypass'])
-                self.status.set('Game selected. Install / update replaces older helper versions; close the game first.')
+                if mode == 6:
+                    self.applied=False
+                    self.using.set('Ultra selected. Apply to update the saved graphics settings.')
+                    if self.route=='Graphics': self.using_label.configure(fg=MUTED)
+                    self.status.set('Your previous preset maps to Ultra. Close the game and click Apply preset to finish the change.')
+                else:
+                    self.saved_label(self.profile.get(), config['enabled'], config['bypass'])
+                    self.status.set('Game selected. Install / update replaces older helper versions; close the game first.')
             else:
                 conflict=any(core.installation_snapshot(exe.parent).values())
                 self.install_status.set('REPAIR NEEDED' if conflict else 'READY TO INSTALL')
@@ -711,9 +716,9 @@ class App:
         core.save_preset(exe.parent, self.profile.get(), self.enabled.get(), neutral_sky=self.neutral_sky.get(), allow_mipmaps=self.allow_mipmaps.get(), collect_stats=self.collect_stats.get(), black_sky=False, flat_ground=self.flat_ground.get(), opaque_structures=self.opaque_structures.get())
         self.saved_label(self.profile.get(), self.enabled.get())
         self.passthrough.set(False)
-        sky='Gray' if self.enabled.get() and self.profile.get()==6 and self.neutral_sky.get() else 'Normal (blue)'
-        ground = (' · Ground: '+('dark flat' if self.neutral_sky.get() else 'natural flat')) if self.enabled.get() and self.profile.get()==6 and self.flat_ground.get() else ''
-        self.status.set('Graphics applied. ' + self.using.get() + '. Sky: '+sky+ground+(' · Opaque structures: experimental' if self.enabled.get() and self.profile.get()==6 and self.opaque_structures.get() else '')+' · restart the game.')
+        sky='Gray' if self.enabled.get() and self.profile.get()==4 and self.neutral_sky.get() else 'Normal (blue)'
+        ground = (' · Ground: '+('dark flat' if self.neutral_sky.get() else 'natural flat')) if self.enabled.get() and self.profile.get()==4 and self.flat_ground.get() else ''
+        self.status.set('Graphics applied. ' + self.using.get() + '. Sky: '+sky+ground+(' · Opaque structures: experimental' if self.enabled.get() and self.profile.get()==4 and self.opaque_structures.get() else '')+' · restart the game.')
         if self.route=='Graphics': self.status_label.configure(fg=SUCCESS)
 
     def save_passthrough(self):

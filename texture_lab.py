@@ -164,14 +164,18 @@ def require_closed(exe):
             raise ValueError("To change the textures you need to leave the game! Close the game completely first.")
 
 
-def settings(bias=2, bypass=False, neutral_sky=True, allow_mipmaps=True, collect_stats=False, black_sky=False, flat_ground=False, opaque_structures=False):
+def settings(bias=2, bypass=False, neutral_sky=None, allow_mipmaps=None, collect_stats=False, black_sky=False, flat_ground=False, opaque_structures=False):
     bias = int(bias)
     if bias not in PRESETS:
-        raise ValueError("Choose Normal, Low, Ultra, or Potato Graphics.")
+        raise ValueError("Choose Normal, Low, or Ultra.")
     actual_bias, size = PRESETS[bias]
+    # Mode 6 remains readable for older installations; the UI migrates it to Ultra.
+    if neutral_sky is None: neutral_sky = bias == 6
+    if allow_mipmaps is None: allow_mipmaps = bias == 6
+    extras = bias in (4, 6)
     return (f"{MARKER}\n[TextureLab]\nEnabled=1\nBias={actual_bias}\n"
-            f"MinTextureSize={size}\nCollectStats={int(collect_stats)}\nNeutralSky={int(bias == 6 and neutral_sky)}\nBlackSky={int(bias == 6 and neutral_sky and black_sky)}\nFlatGround={int(bias == 6 and flat_ground)}\nOpaqueStructures={int(bias == 6 and opaque_structures)}\nIncludeAutogen={int(bias == 6)}\nMinMipLevel={4 if bias == 6 and allow_mipmaps else 0}\n"
-            f"CoarsestMip=0\nForceMipFilter={int(bias == 6 and allow_mipmaps)}\nBypass={int(bypass)}\n").encode("ascii")
+            f"MinTextureSize={size}\nCollectStats={int(collect_stats)}\nNeutralSky={int(extras and neutral_sky)}\nBlackSky={int(extras and neutral_sky and black_sky)}\nFlatGround={int(extras and flat_ground)}\nOpaqueStructures={int(extras and opaque_structures)}\nIncludeAutogen={int(bias == 6 or (bias == 4 and allow_mipmaps))}\nMinMipLevel={4 if extras and allow_mipmaps else 0}\n"
+            f"CoarsestMip=0\nForceMipFilter={int(extras and allow_mipmaps)}\nBypass={int(bypass)}\n").encode("ascii")
 
 
 def preset_from_settings(config):
@@ -346,7 +350,7 @@ def read_settings(folder):
             "opaque_structures": section.get("OpaqueStructures", "0") != "0", "enabled": section.get("Enabled", "1") != "0", "bypass": section.get("Bypass", "0") != "0", "flat_ground": section.get("FlatGround", "0") != "0", "black_sky": section.get("BlackSky", "0") != "0", "neutral_sky": section.get("NeutralSky", "0") != "0", "allow_mipmaps": section.get("ForceMipFilter", "0") != "0", "collect_stats": section.get("CollectStats", "0") != "0"}
 
 
-def save_preset(folder, mode, enabled=True, bypass=False, neutral_sky=True, allow_mipmaps=True, collect_stats=False, black_sky=False, flat_ground=False, opaque_structures=False):
+def save_preset(folder, mode, enabled=True, bypass=False, neutral_sky=None, allow_mipmaps=None, collect_stats=False, black_sky=False, flat_ground=False, opaque_structures=False):
     data = settings(mode, bypass=bypass, neutral_sky=neutral_sky, allow_mipmaps=allow_mipmaps, collect_stats=collect_stats, black_sky=black_sky, flat_ground=flat_ground, opaque_structures=opaque_structures)
     if not enabled: data = data.replace(b"Enabled=1", b"Enabled=0")
     record = owned_manifest(Path(folder))

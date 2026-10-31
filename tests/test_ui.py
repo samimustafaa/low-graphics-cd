@@ -18,7 +18,7 @@ class UITests(unittest.TestCase):
         except tk.TclError: self.skipTest('No display available')
         app = App(root, remember=False)
         self.addCleanup(app.close)
-        self.assertEqual(root.title(), "sg0hann BOOST 1.6.10")
+        self.assertEqual(root.title(), "sg0hann BOOST 1.6.11")
         with tempfile.TemporaryDirectory() as temp:
             exe = Path(temp) / 'client.exe'
             data = bytearray(160); data[:2] = b'MZ'
@@ -30,8 +30,8 @@ class UITests(unittest.TestCase):
                 app.install(); self.assertIn('1.6.10', app.install_status.get())
                 app.select(4); app.apply(); self.assertEqual(core.read_settings(exe.parent)['bias'], 10)
                 app.load_selected(); self.assertEqual(app.profile.get(), 4)
-                app.choose_profile(6); app.flat_ground.set(True); app.apply(); self.assertEqual(core.read_settings(exe.parent)['bias'], 15)
-                app.load_selected(); self.assertEqual(app.profile.get(), 6)
+                app.choose_profile(4); app.allow_mipmaps.set(True); app.flat_ground.set(True); app.apply(); self.assertEqual(core.read_settings(exe.parent)['bias'], 10)
+                app.load_selected(); self.assertEqual(app.profile.get(), 4)
                 self.assertTrue(core.read_settings(exe.parent)['flat_ground'])
                 self.assertTrue(app.flat_ground.get())
                 self.assertFalse(core.read_settings(exe.parent)['neutral_sky'])
@@ -40,7 +40,14 @@ class UITests(unittest.TestCase):
                 self.assertEqual(set(app.sky_buttons),{'normal','gray'})
                 # Old black configs must load as Normal and clear BlackSky on Apply.
                 core.save_preset(exe.parent,6,black_sky=True,flat_ground=True)
+                legacy=(exe.parent / core.INI).read_bytes()
                 app.load_selected();self.assertFalse(app.neutral_sky.get())
+                self.assertEqual(set(app.profile_buttons),{0,2,4})
+                self.assertEqual(app.profile.get(),4)
+                self.assertFalse(app.applied)
+                self.assertEqual((exe.parent / core.INI).read_bytes(),legacy)
+                self.assertNotIn('Potato',app.using.get())
+                with self.assertRaisesRegex(ValueError,'Choose Normal, Low, or Ultra'): app.choose_profile(6)
                 app.apply();self.assertFalse(core.read_settings(exe.parent)['black_sky'])
                 with self.assertRaisesRegex(ValueError,'Choose Normal or Sky Gray'):app.choose_sky('black')
                 gray=app.sky_buttons['gray'];gray.focus_force();root.update()
@@ -51,16 +58,16 @@ class UITests(unittest.TestCase):
                 app.choose_sky('normal');app.apply();self.assertIn('Ground: natural flat',app.status.get());app.load_selected()
                 self.assertFalse(app.neutral_sky.get())
                 self.assertEqual(app.sky_buttons['normal'].text,'✓ Normal (blue)')
-                app.choose_profile(6);self.assertFalse(app.neutral_sky.get())
+                app.choose_profile(4);self.assertFalse(app.neutral_sky.get())
                 self.assertTrue(core.read_settings(exe.parent)['allow_mipmaps'])
-                self.assertIn('You are using Potato Graphics textures', app.using.get())
-                app.apply(); self.assertIn('You are using Potato Graphics textures', app.status.get())
+                self.assertIn('You are using Ultra textures', app.using.get())
+                app.apply(); self.assertIn('You are using Ultra textures', app.status.get())
                 self.assertEqual(app.using_label.cget('fg'),SUCCESS)
                 self.assertEqual(app.status_label.cget('fg'),SUCCESS)
-                app.choose_profile(4)
-                self.assertIn('Potato Graphics', app.using.get()) # Selection alone is not Apply.
-                app.apply(); self.assertIn('You are using Ultra textures', app.using.get())
-                app.choose_profile(6);app.opaque_structures.set(True);app.apply()
+                app.choose_profile(2)
+                self.assertIn('Ultra', app.using.get()) # Selection alone is not Apply.
+                app.apply(); self.assertIn('You are using Low textures', app.using.get())
+                app.choose_profile(4);app.opaque_structures.set(True);app.apply()
                 self.assertTrue(core.read_settings(exe.parent)['opaque_structures'])
                 app.load_selected();self.assertTrue(app.opaque_structures.get())
                 app.enabled.set(False); app.apply(); self.assertFalse(core.read_settings(exe.parent)['enabled'])
@@ -119,7 +126,7 @@ class UITests(unittest.TestCase):
         app.reveal(); self.assertFalse(app.hidden); root.update()
         with patch('texture_ui.messagebox.askyesno',return_value=False) as popup:
             from update_manager import Release
-            r=Release('1.6.10','file','',1,'','')
+            r=Release('1.6.11','file','',1,'','')
             app.offer_update(r,False); popup.assert_called_once()
             root.update()
             self.assertTrue(app.update_banner.winfo_ismapped())
@@ -149,9 +156,9 @@ class UITests(unittest.TestCase):
                 self.assertLessEqual(rw,w,f'{route}: {rw} > {w}')
         self.assertTrue(app.apply_button.winfo_ismapped())
         self.assertLessEqual(app.apply_button.winfo_rooty()+app.apply_button.winfo_height(),root.winfo_rooty()+root.winfo_height())
-        button=app.profile_buttons[6]
+        button=app.profile_buttons[4]
         button.event_generate('<Enter>');button.event_generate('<ButtonPress-1>');button.event_generate('<ButtonRelease-1>')
-        root.update();self.assertEqual(app.profile.get(),6)
+        root.update();self.assertEqual(app.profile.get(),4)
         button=app.profile_buttons[2];button.focus_force();root.update()
         button.event_generate('<KeyPress-space>');button.event_generate('<KeyRelease-space>')
         root.update();self.assertEqual(app.profile.get(),2)

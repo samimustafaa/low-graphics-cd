@@ -112,5 +112,5 @@ jobs:
       - name: Publish release after all checks pass
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.6.10' }}
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.6.11' }}
         run: gh release create "$RELEASE_TAG" release/* --target "$GITHUB_SHA" --title "sg0hann BOOST $RELEASE_TAG" --notes-file RELEASE_NOTES.md

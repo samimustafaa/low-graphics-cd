@@ -6,4 +6,4 @@ Python is included. No terminal commands or separate Python installation are nee
 
 Use Restore original in sg0hann BOOST before uninstalling the control app. Uninstalling the control app alone does not remove the graphics helper from your game folder.
 
-The graphics helper is for a permitted 32-bit Direct3D 9 client. Potato Graphics can blur UI and characters. Gray/black sky and No grass + flat ground require recognized shader metadata; some clients may retain original shaders. FPS gains are hardware dependent and are not guaranteed. The executable is unsigned.
+The graphics helper is for a permitted 32-bit Direct3D 9 client. Strong texture reduction can blur UI and characters. Gray sky and No grass + flat ground require recognized shader metadata; some clients may retain original shaders. FPS gains are hardware dependent and are not guaranteed. The executable is unsigned.
