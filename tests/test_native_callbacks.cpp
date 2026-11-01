@@ -2,6 +2,7 @@
 #define TEXTURELAB_NATIVE_TEST
 #include "../native/texture_lab.cpp"
 #include <assert.h>
+#include <initializer_list>
 #ifdef TEXTURELAB_HOST_TEST
 #include <thread>
 #endif
@@ -32,7 +33,7 @@ static DWORD textureFormat=D3DFMT_X8R8G8B8;
 static D3DRESOURCETYPE textureKind=D3DRTYPE_TEXTURE;
 static D3DRESOURCETYPE STDMETHODCALLTYPE getType(IDirect3DTexture9*) {return textureKind;}
 static DWORD STDMETHODCALLTYPE getCount(IDirect3DTexture9*) {return textureLevels;}
-static HRESULT STDMETHODCALLTYPE getDesc(IDirect3DTexture9*,UINT,D3DSURFACE_DESC* out) {memset(out,0,sizeof(*out));out->Width=out->Height=textureSize;out->Usage=textureUsage;out->Format=textureFormat;return S_OK;}
+static HRESULT STDMETHODCALLTYPE getDesc(IDirect3DTexture9*,UINT,D3DSURFACE_DESC* out) {memset(out,0,sizeof(*out));out->Width=out->Height=textureSize;out->Usage=textureUsage;out->Format=static_cast<decltype(out->Format)>(textureFormat);return S_OK;}
 // Simulate a runtime with a private virtual method after its public factory ABI.
 // Its CreateDevice must see the original real pointer/table, including that tail.
 struct ExtendedFactoryTable {
