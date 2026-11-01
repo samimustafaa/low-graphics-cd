@@ -28,10 +28,11 @@ static ULONG STDMETHODCALLTYPE doRelease(IDirect3DDevice9* d) { auto f=(FakeDevi
 static HRESULT STDMETHODCALLTYPE begin(IDirect3DDevice9*) { return S_OK; }
 static HRESULT STDMETHODCALLTYPE end(IDirect3DDevice9*,IDirect3DStateBlock9**) { return S_OK; }
 static UINT textureSize=512;static DWORD textureUsage=0;static DWORD textureLevels=8;
+static DWORD textureFormat=D3DFMT_X8R8G8B8;
 static D3DRESOURCETYPE textureKind=D3DRTYPE_TEXTURE;
 static D3DRESOURCETYPE STDMETHODCALLTYPE getType(IDirect3DTexture9*) {return textureKind;}
 static DWORD STDMETHODCALLTYPE getCount(IDirect3DTexture9*) {return textureLevels;}
-static HRESULT STDMETHODCALLTYPE getDesc(IDirect3DTexture9*,UINT,D3DSURFACE_DESC* out) {memset(out,0,sizeof(*out));out->Width=out->Height=textureSize;out->Usage=textureUsage;return S_OK;}
+static HRESULT STDMETHODCALLTYPE getDesc(IDirect3DTexture9*,UINT,D3DSURFACE_DESC* out) {memset(out,0,sizeof(*out));out->Width=out->Height=textureSize;out->Usage=textureUsage;out->Format=textureFormat;return S_OK;}
 // Simulate a runtime with a private virtual method after its public factory ABI.
 // Its CreateDevice must see the original real pointer/table, including that tail.
 struct ExtendedFactoryTable {
@@ -156,6 +157,27 @@ int main() {
     IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPFILTER,D3DTEXF_NONE);
     textureLevels=1;IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);
     assert(first.filter==D3DTEXF_NONE && first.value==0);textureLevels=8;
+    // Reproduce vanishing leaves: a previous opaque bind was reduced, then an
+    // alpha-mask texture is bound. Restore all three original sampler values,
+    // including late writes, for every potentially transparent/unknown format.
+    ctx(d)->config.minimumMip=4;
+    for(DWORD format:{21u,25u,26u,28u,29u,31u,32u,50u,51u,0x31545844u,
+                      0x32545844u,0x33545844u,0x34545844u,0x35545844u,0u}) {
+        textureFormat=D3DFMT_X8R8G8B8;
+        IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);
+        assert(first.value==floatBits(15.0f) && first.filter==D3DTEXF_POINT && first.mip==4);
+        textureFormat=format;
+        IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);
+        assert(first.value==0 && first.filter==D3DTEXF_NONE && first.mip==0);
+        IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPMAPLODBIAS,floatBits(.75f));
+        IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPFILTER,D3DTEXF_LINEAR);
+        IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MAXMIPLEVEL,1);
+        assert(first.value==floatBits(.75f) && first.filter==D3DTEXF_LINEAR && first.mip==1);
+        IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPMAPLODBIAS,0);
+        IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPFILTER,D3DTEXF_NONE);
+        IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MAXMIPLEVEL,0);
+    }
+    textureFormat=D3DFMT_X8R8G8B8;
     // Optional filter rejection must preserve the game's valid HRESULT/value.
     IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);
     rejectPoint=true;

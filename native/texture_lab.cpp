@@ -1,4 +1,4 @@
-// Texture Lab 1.6.10. Public COM forwarding wrappers. System objects, private
+// Texture Lab 1.6.12. Public COM forwarding wrappers. System objects, private
 // runtime layouts and runtime vtables are never modified. Original MIT source.
 #define CINTERFACE
 #define COBJMACROS
@@ -48,7 +48,7 @@ static BOOL CALLBACK initialize(PINIT_ONCE, PVOID, PVOID*) {
     HMODULE pinned;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,
                       (LPCWSTR)selfModule,&pinned);
-    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.6.10 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
+    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.6.12 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
     logLine(line); return TRUE;
 }
 static FARPROC resolve(const char* name) {
@@ -269,6 +269,18 @@ static void applyMip(DeviceContext* c,DWORD slot,bool eligible) {
         logLine("Close-range mip limit rejected; original level retained and option suspended.");
     }
 }
+// Only reduce formats whose color channels are explicitly opaque. In particular,
+// DXT1 may contain 1-bit leaf coverage; never assume it is an opaque format.
+// Alpha, luminance/mask, compressed and unknown formats keep all game sampler
+// values. This is mandatory, including old INIs with aggressive mip limits.
+static bool canReduceFormat(DWORD format) {
+    switch(format) {
+        case D3DFMT_R8G8B8: case D3DFMT_X8R8G8B8: case D3DFMT_R5G6B5:
+        case D3DFMT_X1R5G5B5: case D3DFMT_R3G3B2: case D3DFMT_X4R4G4B4:
+        case D3DFMT_X8B8G8R8:return true;
+        default:return false;
+    }
+}
 static HRESULT STDMETHODCALLTYPE texture(IDirect3DDevice9* d,DWORD slot,IDirect3DBaseTexture9* t) {
     auto c=ctx(d); Hold<DeviceContext> hold(c); CallGuard entry;
     HRESULT hr=c->original->SetTexture(c->real,slot,t);
@@ -290,7 +302,7 @@ static HRESULT STDMETHODCALLTYPE texture(IDirect3DDevice9* d,DWORD slot,IDirect3
             IDirect3DCubeTexture9_GetLevelDesc((IDirect3DCubeTexture9*)t,0,&desc):
             IDirect3DTexture9_GetLevelDesc((IDirect3DTexture9*)t,0,&desc);
         if(SUCCEEDED(description))
-            eligible=!(desc.Usage&(D3DUSAGE_RENDERTARGET|D3DUSAGE_DEPTHSTENCIL)) &&
+            eligible=canReduceFormat(desc.Format) && !(desc.Usage&(D3DUSAGE_RENDERTARGET|D3DUSAGE_DEPTHSTENCIL)) &&
                 (!(desc.Usage&D3DUSAGE_AUTOGENMIPMAP) || c->config.includeAutogen) &&
                 (levels>1 || (c->config.includeAutogen && (desc.Usage&D3DUSAGE_AUTOGENMIPMAP))) &&
                 desc.Width>=c->config.minSize && desc.Height>=c->config.minSize;

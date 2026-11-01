@@ -226,7 +226,7 @@ class App:
         self.route = 'Graphics'
         self.font = 'Segoe UI' if 'Segoe UI' in tkfont.families(root) else 'Helvetica'
         self.wrapped_labels = []
-        root.title('sg0hann BOOST 1.6.11')
+        root.title('sg0hann BOOST 1.6.12')
         scale = float(root.tk.call('tk', 'scaling')) / (96 / 72)
         root.withdraw()
         self.work_area = monitor_work_area(root)
@@ -262,7 +262,7 @@ class App:
         for name in ('Graphics', 'Diagnostics', 'About'):
             self.nav[name] = self.button(self.sidebar, name, lambda n=name: self.show(n), quiet=True)
             self.nav[name].pack(side='left', padx=5, pady=12)
-        self.label(self.sidebar, 'v1.6.11', 9, MUTED).pack(side='right', padx=28)
+        self.label(self.sidebar, 'v1.6.12', 9, MUTED).pack(side='right', padx=28)
         body = tk.Frame(root, bg=BG)
         body.pack(fill='both', expand=True)
         self.update_banner = self.label(body,'New update - update the app now',9,SUCCESS,True,anchor='center',cursor='hand2')
@@ -373,7 +373,7 @@ class App:
             return
         self.update_busy = True
         def worker():
-            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.11'), manual)))
+            try: self.jobs.put(('release', (update_manager.check_for_update('1.6.12'), manual)))
             except Exception as error: self.jobs.put(('update_error', (str(error), manual)))
         threading.Thread(target=worker, daemon=True).start()
 
@@ -497,7 +497,7 @@ class App:
         header=tk.Frame(quality,bg=CARD);header.pack(fill='x')
         left=tk.Frame(header,bg=CARD);left.pack(side='left')
         self.label(left,'Texture changes',11,TEXT,True).pack(anchor='w')
-        self.label(left,'Turn off for normal texture detail.',8,MUTED).pack(anchor='w')
+        self.label(left,'Turn off for normal detail. Tree leaf textures stay original.',8,MUTED).pack(anchor='w')
         Switch(header,self.enabled).pack(side='right')
         presets=tk.Frame(quality,bg=CARD);presets.pack(fill='x',pady=(8,6))
         self.profile_buttons={}
@@ -653,7 +653,13 @@ class App:
                 self.opaque_structures.set(config['opaque_structures'])
                 self.allow_mipmaps.set(config['allow_mipmaps'])
                 self.collect_stats.set(config['collect_stats'])
-                if mode == 6:
+                if record.get('build_version') != '1.6.12':
+                    self.install_status.set('HELPER UPDATE REQUIRED')
+                    self.applied=False
+                    self.using.set('Update the graphics helper to restore protected leaf textures.')
+                    if self.route=='Graphics': self.using_label.configure(fg=DANGER)
+                    self.status.set('Close the game, then click Install / update to enable the leaf texture fix.')
+                elif mode == 6:
                     self.applied=False
                     self.using.set('Ultra selected. Apply to update the saved graphics settings.')
                     if self.route=='Graphics': self.using_label.configure(fg=MUTED)
@@ -680,7 +686,7 @@ class App:
         data = core.bundled_helper()
         result = core.install_or_update(exe.parent, data)
         self.load_selected()
-        self.status.set(f'Helper {result} to 1.6.10. Restart the game and test Low first. Native loading and texture changes still need an in-game check.')
+        self.status.set(f'Helper {result} to 1.6.12. Restart the game and test Low first. Native loading and texture changes still need an in-game check.')
 
     def repair(self):
         exe = self.game(); core.require_closed(exe)

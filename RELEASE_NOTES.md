@@ -1,10 +1,12 @@
-# sg0hann BOOST 1.6.11
+# sg0hann BOOST 1.6.12
 
-- Removed the Potato Graphics preset. The app now shows Normal, Low, and Ultra.
-- Kept the extra graphics controls under Ultra: sky color, stronger close-up mipmaps, grass removal/flat ground, and experimental opaque structures.
-- Saved selections from the removed preset open as Ultra, with the previous options retained. Close the game and Apply to finish migration; opening the app does not rewrite game files.
-- Existing Ultra settings retain their usual texture bias and size. Optional mipmaps remain off unless enabled or carried over from saved settings.
+- Protected tree leaf coverage in every preset, including older aggressive saved settings. The helper no longer forces coarse mip levels, texture bias, or mip filters on alpha-capable, mask, compressed, or unknown texture formats. DXT1 is protected because it can contain transparent leaf cutouts.
+- Kept texture reduction on explicitly opaque RGB formats. Some other transparent surfaces also keep their original texture detail as part of this conservative fix.
+- Added Windows rendering regressions with visible leaf pixels, transparent cutouts, and deliberately transparent lower mips.
+- The launcher clearly prompts users to update an older installed graphics helper.
 
-Repair, restore, diagnostics, tray, and automatic updates remain available. The native helper stays at 1.6.10.
+**After updating:** close the game, click **Install / update**, Apply your preset, and relaunch. Updating only the launcher does not replace the helper in the game folder.
 
-Download **sg0hann-BOOST-Setup-1.6.11.exe** or **sg0hann-BOOST-Portable-1.6.11.zip**.
+The app does not restore game archives changed by other tools. Test foliage in your actual game version after installing this fix.
+
+Download **sg0hann-BOOST-Setup-1.6.12.exe** or **sg0hann-BOOST-Portable-1.6.12.zip**.

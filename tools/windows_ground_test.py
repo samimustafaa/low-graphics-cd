@@ -49,12 +49,12 @@ try:
         check(method(device,89,c.c_long,w.DWORD)(device,0x002))
         vertices=(c.c_float*9)(-1,-1,.5, 0,1,.5, 1,-1,.5)
         class Locked(c.Structure):_fields_=[('pitch',c.c_int),('bits',c.c_void_p)]
-        def draw(vs,ps):
+        def draw(vs,ps,sample=(32,32)):
             check(method(device,92,c.c_long,c.c_void_p)(device,vs));check(method(device,107,c.c_long,c.c_void_p)(device,ps))
             check(method(device,43,c.c_long,w.DWORD,c.c_void_p,w.DWORD,w.DWORD,c.c_float,w.DWORD)(device,0,None,1,0xffaa1122,1,0))
             check(method(device,41,c.c_long)(device));check(method(device,83,c.c_long,w.UINT,w.UINT,c.c_void_p,w.UINT)(device,4,1,vertices,12));check(method(device,42,c.c_long)(device))
             locked=Locked();check(method(target,13,c.c_long,c.POINTER(Locked),c.c_void_p,w.DWORD)(target,c.byref(locked),None,0x10))
-            try:return struct.unpack('<I',c.string_at(locked.bits+32*locked.pitch+32*4,4))[0]&0xffffff
+            try:return struct.unpack('<I',c.string_at(locked.bits+sample[1]*locked.pitch+sample[0]*4,4))[0]&0xffffff
             finally:check(method(target,14,c.c_long)(target))
         normalVS=create('struct O{float4 p:POSITION;float2 uv:TEXCOORD0;};O main(float4 p:POSITION){O o;o.p=p;o.uv=p.xy*.5+.5;return o;}','vs_2_0');normalPS=create('float4 main():COLOR {return float4(0,1,0,1);}','ps_2_0')
         assert draw(normalVS,normalPS)==0x00ff00,'Control triangle must render'
@@ -65,7 +65,7 @@ try:
             print('PASS: real HLSL grass recognized, replacement accepted and grass pixels absent for vs',model)
         def terrain_texture(rgb):
             texture=c.c_void_p()
-            check(method(device,23,c.c_long,w.UINT,w.UINT,w.UINT,w.DWORD,w.UINT,w.UINT,c.POINTER(c.c_void_p),c.c_void_p)(device,256,256,0,0,21,1,c.byref(texture),None))
+            check(method(device,23,c.c_long,w.UINT,w.UINT,w.UINT,w.DWORD,w.UINT,w.UINT,c.POINTER(c.c_void_p),c.c_void_p)(device,256,256,0,0,22,1,c.byref(texture),None))
             count=method(texture,13,w.DWORD)(texture)
             for level in range(count):
                 size=max(1,256>>level);locked=Locked()
@@ -98,6 +98,52 @@ try:
                 finally:
                     check(method(device,65,c.c_long,w.DWORD,c.c_void_p)(device,0,None));release(texture)
             print('PASS:',mode,'terrain preserves natural green/brown colors with low mip detail' if mode=='normal' else 'terrain retains dark flat palette','for ps',model)
+
+        # Foliage regression: mip 0 contains a visible cut-out leaf; all lower
+        # mips are transparent. An imposed bias/mip floor would erase the leaf.
+        for fmt,label in ((21,'RGBA'),(0x31545844,'DXT1'),(0x35545844,'DXT5')):
+            leaf=c.c_void_p()
+            hr=method(device,23,c.c_long,w.UINT,w.UINT,w.UINT,w.DWORD,w.UINT,w.UINT,c.POINTER(c.c_void_p),c.c_void_p)(device,256,256,0,0,fmt,1,c.byref(leaf),None)
+            if hr<0 and fmt!=21:
+                print('SKIP: driver cannot create foliage fixture',label);continue
+            check(hr)
+            try:
+                count=method(leaf,13,w.DWORD)(leaf)
+                for level in range(count):
+                    size=max(1,256>>level);locked=Locked()
+                    check(method(leaf,19,c.c_long,w.UINT,c.POINTER(Locked),c.c_void_p,w.DWORD)(leaf,level,c.byref(locked),None,0))
+                    try:
+                        if fmt==21:
+                            for y in range(size):
+                                row=[(0xff00ff00 if level==0 and 64<=x<192 and 64<=y<192 else 0x0000ff00) for x in range(size)]
+                                c.memmove(locked.bits+y*locked.pitch,struct.pack('<'+'I'*size,*row),size*4)
+                        else:
+                            blocks=max(1,(size+3)//4)
+                            for y in range(blocks):
+                                row=b''
+                                for x in range(blocks):
+                                    solid=level==0 and 64<=x*4<192 and 64<=y*4<192
+                                    if fmt==0x31545844:
+                                        row+=struct.pack('<HHI',0x07e0,0x07e0,0 if solid else 0xffffffff)
+                                    else:
+                                        indices=0 if solid else sum(1<<(3*j) for j in range(16))
+                                        row+=bytes((255,0))+indices.to_bytes(6,'little')+struct.pack('<HHI',0x07e0,0x07e0,0)
+                                c.memmove(locked.bits+y*locked.pitch,row,len(row))
+                    finally:check(method(leaf,20,c.c_long,w.UINT)(leaf,level))
+                check(method(device,65,c.c_long,w.DWORD,c.c_void_p)(device,0,leaf))
+                getstate=method(device,68,c.c_long,w.DWORD,w.UINT,c.POINTER(w.DWORD))
+                setstate=method(device,69,c.c_long,w.DWORD,w.UINT,w.DWORD)
+                for state in (7,8,9):
+                    check(setstate(device,0,state,0));value=w.DWORD();check(getstate(device,0,state,c.byref(value)))
+                    assert value.value==0,(label,state,value.value)
+                source='sampler2D sam_diffuse:register(s0);float4 main(float2 uv:TEXCOORD0):COLOR {float4 leaf=tex2D(sam_diffuse,uv);clip(leaf.a-.5);return leaf;}'
+                for model in (2,3):
+                    shader=create(source,f'ps_{model}_0')
+                    assert draw(normalVS,shader)==0x00ff00,(label,model,'leaf disappeared')
+                    assert draw(normalVS,shader,(32,54))==0xaa1122,(label,model,'leaf cutout lost')
+                    print('PASS: original leaf pixels and cutout retained with aggressive mip settings',mode,label,model)
+            finally:
+                check(method(device,65,c.c_long,w.DWORD,c.c_void_p)(device,0,None));release(leaf)
 
 finally:
     for shader in shaders:release(shader)

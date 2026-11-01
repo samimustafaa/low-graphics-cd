@@ -40,7 +40,7 @@ try:
         getstate=method(device,68,c.c_long,w.DWORD,w.UINT,c.POINTER(w.DWORD))
         bind=method(device,65,c.c_long,w.DWORD,c.c_void_p)
         create=method(device,23,c.c_long,w.UINT,w.UINT,w.UINT,w.DWORD,w.UINT,w.UINT,c.POINTER(c.c_void_p),c.c_void_p)
-        texture=c.c_void_p();check(create(device,256,256,0,0,21,1,c.byref(texture),None))
+        texture=c.c_void_p();check(create(device,256,256,0,0,22,1,c.byref(texture),None))
         check(setstate(device,0,7,0));check(setstate(device,0,8,0))
         check(bind(device,0,texture))
         # Reproduce the previously missed call order: game writes after binding.
@@ -56,7 +56,7 @@ try:
         # Exercise the real cube texture COM interface (sky/environment coverage).
         cube=c.c_void_p()
         createcube=method(device,25,c.c_long,w.UINT,w.UINT,w.DWORD,w.UINT,w.UINT,c.POINTER(c.c_void_p),c.c_void_p)
-        check(createcube(device,256,0,0,21,1,c.byref(cube),None))
+        check(createcube(device,256,0,0,22,1,c.byref(cube),None))
         try:
             check(bind(device,0,cube));check(setstate(device,0,9,0))
             check(getstate(device,0,9,c.byref(floor)));assert floor.value==4

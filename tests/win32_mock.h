@@ -32,7 +32,9 @@ inline bool IsEqualIID(REFIID a,REFIID b){return a==b;}
 struct INIT_ONCE {bool ran;};using PINIT_ONCE=INIT_ONCE*;
 #define INIT_ONCE_STATIC_INIT {false}
 struct D3DPRESENT_PARAMETERS {};struct D3DDISPLAYMODEEX {};struct IDirect3DStateBlock9 {};
-struct D3DSURFACE_DESC {DWORD Usage,Width,Height;};
+constexpr DWORD D3DFMT_R8G8B8=20,D3DFMT_X8R8G8B8=22,D3DFMT_R5G6B5=23,
+ D3DFMT_X1R5G5B5=24,D3DFMT_R3G3B2=27,D3DFMT_X4R4G4B4=30,D3DFMT_X8B8G8R8=33;
+struct D3DSURFACE_DESC {DWORD Usage,Width,Height,Format;};
 struct IDirect3DVertexShader9;
 struct IDirect3DPixelShader9;
 struct IDirect3DDevice9;struct IDirect3DDevice9Ex;struct IDirect3D9;struct IDirect3D9Ex;struct IDirect3DTexture9;

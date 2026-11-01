@@ -18,7 +18,7 @@ class UITests(unittest.TestCase):
         except tk.TclError: self.skipTest('No display available')
         app = App(root, remember=False)
         self.addCleanup(app.close)
-        self.assertEqual(root.title(), "sg0hann BOOST 1.6.11")
+        self.assertEqual(root.title(), "sg0hann BOOST 1.6.12")
         with tempfile.TemporaryDirectory() as temp:
             exe = Path(temp) / 'client.exe'
             data = bytearray(160); data[:2] = b'MZ'
@@ -27,7 +27,16 @@ class UITests(unittest.TestCase):
             exe.write_bytes(data)
             app.path.set(str(exe)); app.load_selected()
             with patch.object(core, 'require_closed', lambda value: None):
-                app.install(); self.assertIn('1.6.10', app.install_status.get())
+                app.install(); self.assertIn('1.6.12', app.install_status.get())
+                import json
+                record=exe.parent / core.MANIFEST
+                saved=json.loads(record.read_text());saved['build_version']='1.6.10'
+                record.write_text(json.dumps(saved))
+                app.load_selected()
+                self.assertEqual(app.install_status.get(),'HELPER UPDATE REQUIRED')
+                self.assertFalse(app.applied)
+                self.assertIn('Install / update',app.status.get())
+                app.install()
                 app.select(4); app.apply(); self.assertEqual(core.read_settings(exe.parent)['bias'], 10)
                 app.load_selected(); self.assertEqual(app.profile.get(), 4)
                 app.choose_profile(4); app.allow_mipmaps.set(True); app.flat_ground.set(True); app.apply(); self.assertEqual(core.read_settings(exe.parent)['bias'], 10)
@@ -126,7 +135,7 @@ class UITests(unittest.TestCase):
         app.reveal(); self.assertFalse(app.hidden); root.update()
         with patch('texture_ui.messagebox.askyesno',return_value=False) as popup:
             from update_manager import Release
-            r=Release('1.6.11','file','',1,'','')
+            r=Release('1.6.12','file','',1,'','')
             app.offer_update(r,False); popup.assert_called_once()
             root.update()
             self.assertTrue(app.update_banner.winfo_ismapped())
