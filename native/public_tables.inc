@@ -236,10 +236,10 @@ static void fillDeviceTable(DeviceContext* c) {
     c->entries[78]=(void*)forwardDevice_GetSoftwareVertexProcessing;
     c->entries[79]=(void*)forwardDevice_SetNPatchMode;
     c->entries[80]=(void*)forwardDevice_GetNPatchMode;
-    c->entries[81]=(void*)forwardDevice_DrawPrimitive;
-    c->entries[82]=(void*)forwardDevice_DrawIndexedPrimitive;
-    c->entries[83]=(void*)forwardDevice_DrawPrimitiveUP;
-    c->entries[84]=(void*)forwardDevice_DrawIndexedPrimitiveUP;
+    c->entries[81]=(void*)drawPrimitive;
+    c->entries[82]=(void*)drawIndexedPrimitive;
+    c->entries[83]=(void*)drawPrimitiveUP;
+    c->entries[84]=(void*)drawIndexedPrimitiveUP;
     c->entries[85]=(void*)forwardDevice_ProcessVertices;
     c->entries[86]=(void*)forwardDevice_CreateVertexDeclaration;
     c->entries[87]=(void*)forwardDevice_SetVertexDeclaration;

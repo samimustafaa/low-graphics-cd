@@ -50,7 +50,8 @@ try:
         vertices=(c.c_float*9)(-1,-1,.5, 0,1,.5, 1,-1,.5)
         class Locked(c.Structure):_fields_=[('pitch',c.c_int),('bits',c.c_void_p)]
         def draw(vs,ps,sample=(32,32)):
-            check(method(device,92,c.c_long,c.c_void_p)(device,vs));check(method(device,107,c.c_long,c.c_void_p)(device,ps))
+            check(method(device,92,c.c_long,c.c_void_p)(device,vs))
+            if ps is not None:check(method(device,107,c.c_long,c.c_void_p)(device,ps))
             check(method(device,43,c.c_long,w.DWORD,c.c_void_p,w.DWORD,w.DWORD,c.c_float,w.DWORD)(device,0,None,1,0xffaa1122,1,0))
             check(method(device,41,c.c_long)(device));check(method(device,83,c.c_long,w.UINT,w.UINT,c.c_void_p,w.UINT)(device,4,1,vertices,12));check(method(device,42,c.c_long)(device))
             locked=Locked();check(method(target,13,c.c_long,c.POINTER(Locked),c.c_void_p,w.DWORD)(target,c.byref(locked),None,0x10))
@@ -135,12 +136,33 @@ try:
                 setstate=method(device,69,c.c_long,w.DWORD,w.UINT,w.DWORD)
                 for state in (7,8,9):
                     check(setstate(device,0,state,0));value=w.DWORD();check(getstate(device,0,state,c.byref(value)))
-                    assert value.value==0,(label,state,value.value)
+                    # Coverage is restored at the draw, after shader/state changes.
                 source='sampler2D sam_diffuse:register(s0);float4 main(float2 uv:TEXCOORD0):COLOR {float4 leaf=tex2D(sam_diffuse,uv);clip(leaf.a-.5);return leaf;}'
                 for model in (2,3):
                     shader=create(source,f'ps_{model}_0')
                     assert draw(normalVS,shader)==0x00ff00,(label,model,'leaf disappeared')
                     assert draw(normalVS,shader,(32,54))==0xaa1122,(label,model,'leaf cutout lost')
+                    for state in (7,8,9):
+                        value=w.DWORD();check(getstate(device,0,state,c.byref(value)))
+                        assert value.value==0,(label,model,state,value.value)
+                    # Same RGBA/DXT resource is reduced again with an opaque
+                    # shader: no blanket format exclusion may remain.
+                    assert draw(normalVS,normalPS)==0x00ff00
+                    value=w.DWORD();check(getstate(device,0,8,c.byref(value)))
+                    assert struct.unpack('<f',struct.pack('<I',value.value))[0]==15.0,(label,'opaque bias missing')
+                    check(getstate(device,0,9,c.byref(value)));assert value.value==4,(label,'opaque mip floor missing')
+                    assert draw(normalVS,shader)==0x00ff00,(label,'leaf lost after opaque draw')
+                    native=c.c_void_p();block=c.c_void_p()
+                    try:
+                        check(method(leaf,3,c.c_long,c.POINTER(c.c_void_p))(leaf,c.byref(native)))
+                        check(method(device,59,c.c_long,w.UINT,c.POINTER(c.c_void_p))(device,1,c.byref(block)))
+                        assert draw(normalVS,normalPS)==0x00ff00
+                        check(method(native,107,c.c_long,c.c_void_p)(native,shader))
+                        assert draw(normalVS,None)==0x00ff00,(label,'native shader bind lost leaves')
+                        assert draw(normalVS,normalPS)==0x00ff00
+                        check(method(block,5,c.c_long)(block))
+                        assert draw(normalVS,None)==0x00ff00,(label,'state-block shader bind lost leaves')
+                    finally:release(block);release(native)
                     print('PASS: original leaf pixels and cutout retained with aggressive mip settings',mode,label,model)
             finally:
                 check(method(device,65,c.c_long,w.DWORD,c.c_void_p)(device,0,None));release(leaf)

@@ -1,12 +1,11 @@
-# sg0hann BOOST 1.6.12
+# sg0hann BOOST 1.6.13
 
-- Protected tree leaf coverage in every preset, including older aggressive saved settings. The helper no longer forces coarse mip levels, texture bias, or mip filters on alpha-capable, mask, compressed, or unknown texture formats. DXT1 is protected because it can contain transparent leaf cutouts.
-- Kept texture reduction on explicitly opaque RGB formats. Some other transparent surfaces also keep their original texture detail as part of this conservative fix.
-- Added Windows rendering regressions with visible leaf pixels, transparent cutouts, and deliberately transparent lower mips.
-- The launcher clearly prompts users to update an older installed graphics helper.
+- Restored the previous Low and Ultra texture reduction for opaque materials, including RGBA and compressed textures that 1.6.12 excluded. Normal keeps the game's original texture sampling.
+- Kept tree-leaf protection: cutout shaders and alpha-test/blended draws use original sampling. Unknown or unreadable pixel shaders are also protected. Other transparent materials may therefore keep more detail.
+- Preset values, sky choices and Ultra options are unchanged. Potato Graphics remains removed.
+- Added draw-boundary coverage checks with a bounded shader-analysis cache. No texture readback or archive modifications. Normal/off avoids these extra checks.
+- Windows rendering tests cover visible leaves and cutouts, switching the same RGBA/DXT resource between leaf and opaque shaders, and restoring strong opaque reduction.
 
-**After updating:** close the game, click **Install / update**, Apply your preset, and relaunch. Updating only the launcher does not replace the helper in the game folder.
+**To activate the fix:** update the app, close the game, click **Install / update**, then **Apply preset** and relaunch. Updating the launcher alone does not replace the game helper.
 
-The app does not restore game archives changed by other tools. Test foliage in your actual game version after installing this fix.
-
-Download **sg0hann-BOOST-Setup-1.6.12.exe** or **sg0hann-BOOST-Portable-1.6.12.zip**.
+Download **sg0hann-BOOST-Setup-1.6.13.exe** or **sg0hann-BOOST-Portable-1.6.13.zip**. Test your actual game client; performance depends on the PC and scene.

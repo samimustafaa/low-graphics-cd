@@ -28,6 +28,20 @@ static ULONG STDMETHODCALLTYPE doAdd(IDirect3DDevice9* d) { return ++((FakeDevic
 static ULONG STDMETHODCALLTYPE doRelease(IDirect3DDevice9* d) { auto f=(FakeDevice*)d;ULONG n=--f->refs;if(!n) f->lpVtbl=nullptr;return n; }
 static HRESULT STDMETHODCALLTYPE begin(IDirect3DDevice9*) { return S_OK; }
 static HRESULT STDMETHODCALLTYPE end(IDirect3DDevice9*,IDirect3DStateBlock9**) { return S_OK; }
+static bool alphaTest=false,alphaBlend=false,failQuery=false;
+static int stateReads=0;
+struct CoverageShader {const IDirect3DPixelShader9Vtbl* lpVtbl;const DWORD* code;UINT bytes;ULONG refs;int reads;};
+static IDirect3DPixelShader9* activeShader=nullptr;
+static ULONG STDMETHODCALLTYPE shaderAdd(IDirect3DPixelShader9* p){return ++((CoverageShader*)p)->refs;}
+static ULONG STDMETHODCALLTYPE shaderDrop(IDirect3DPixelShader9* p){return --((CoverageShader*)p)->refs;}
+static HRESULT STDMETHODCALLTYPE shaderRead(IDirect3DPixelShader9* p,void* out,UINT* bytes){auto s=(CoverageShader*)p;++s->reads;if(out){if(*bytes<s->bytes)return D3DERR_INVALIDCALL;memcpy(out,s->code,s->bytes);}*bytes=s->bytes;return S_OK;}
+
+static HRESULT STDMETHODCALLTYPE getRender(IDirect3DDevice9*,D3DRENDERSTATETYPE type,DWORD* value){++stateReads;*value=type==D3DRS_ALPHATESTENABLE?alphaTest:alphaBlend;return failQuery?D3DERR_INVALIDCALL:S_OK;}
+static HRESULT STDMETHODCALLTYPE getPixel(IDirect3DDevice9*,IDirect3DPixelShader9** out){*out=activeShader;if(*out)IDirect3DPixelShader9_AddRef(*out);return S_OK;}
+static HRESULT STDMETHODCALLTYPE drawFake(IDirect3DDevice9*,D3DPRIMITIVETYPE,UINT,UINT){return S_OK;}
+static HRESULT STDMETHODCALLTYPE drawIndexedFake(IDirect3DDevice9*,D3DPRIMITIVETYPE,INT,UINT,UINT,UINT,UINT){return S_OK;}
+static HRESULT STDMETHODCALLTYPE drawUPFake(IDirect3DDevice9*,D3DPRIMITIVETYPE,UINT,const void*,UINT){return S_OK;}
+static HRESULT STDMETHODCALLTYPE drawIndexedUPFake(IDirect3DDevice9*,D3DPRIMITIVETYPE,UINT,UINT,UINT,const void*,D3DFORMAT,const void*,UINT){return S_OK;}
 static UINT textureSize=512;static DWORD textureUsage=0;static DWORD textureLevels=8;
 static DWORD textureFormat=D3DFMT_X8R8G8B8;
 static D3DRESOURCETYPE textureKind=D3DRTYPE_TEXTURE;
@@ -72,6 +86,9 @@ int main() {
     WritePrivateProfileStringW(L"TextureLab",L"Bias",L"2",iniPath);
     WritePrivateProfileStringW(L"TextureLab",L"Bypass",L"0",iniPath);
     reentryTLS=TlsAlloc(); assert(reentryTLS!=TLS_OUT_OF_INDEXES);
+    realTable.GetRenderState=getRender;realTable.GetPixelShader=getPixel;
+    realTable.DrawPrimitive=drawFake;realTable.DrawIndexedPrimitive=drawIndexedFake;
+    realTable.DrawPrimitiveUP=drawUPFake;realTable.DrawIndexedPrimitiveUP=drawIndexedUPFake;
     realTable.QueryInterface=noQI;realTable.SetTexture=setTexture;realTable.SetSamplerState=setSampler;
     realTable.AddRef=doAdd;realTable.Reset=doReset;realTable.Release=doRelease;realTable.BeginStateBlock=begin;realTable.EndStateBlock=end;
     IDirect3DTexture9Vtbl texTable={};texTable.GetType=getType;texTable.GetLevelCount=getCount;texTable.GetLevelDesc=getDesc;
@@ -158,26 +175,55 @@ int main() {
     IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPFILTER,D3DTEXF_NONE);
     textureLevels=1;IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);
     assert(first.filter==D3DTEXF_NONE && first.value==0);textureLevels=8;
-    // Reproduce vanishing leaves: a previous opaque bind was reduced, then an
-    // alpha-mask texture is bound. Restore all three original sampler values,
-    // including late writes, for every potentially transparent/unknown format.
+    // Restore the original reduction for every format on opaque materials,
+    // including RGBA and compressed buildings/skins that 1.6.12 excluded.
     ctx(d)->config.minimumMip=4;
     for(DWORD format:{21u,25u,26u,28u,29u,31u,32u,50u,51u,0x31545844u,
                       0x32545844u,0x33545844u,0x34545844u,0x35545844u,0u}) {
-        textureFormat=D3DFMT_X8R8G8B8;
-        IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);
-        assert(first.value==floatBits(15.0f) && first.filter==D3DTEXF_POINT && first.mip==4);
+        alphaTest=alphaBlend=false;
+        assert(SUCCEEDED(drawPrimitive(d,(D3DPRIMITIVETYPE)4,0,1)));
         textureFormat=format;
         IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);
+        assert(first.value==floatBits(15.0f) && first.filter==D3DTEXF_POINT && first.mip==4);
+        // Alpha state may change after the texture was bound. Restore before
+        // the draw, without excluding the format from opaque draws forever.
+        alphaTest=true;
+        assert(SUCCEEDED(drawPrimitive(d,(D3DPRIMITIVETYPE)4,0,1)));
         assert(first.value==0 && first.filter==D3DTEXF_NONE && first.mip==0);
         IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPMAPLODBIAS,floatBits(.75f));
         IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPFILTER,D3DTEXF_LINEAR);
         IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MAXMIPLEVEL,1);
+        assert(SUCCEEDED(drawIndexedPrimitive(d,(D3DPRIMITIVETYPE)4,0,0,3,0,1)));
         assert(first.value==floatBits(.75f) && first.filter==D3DTEXF_LINEAR && first.mip==1);
         IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPMAPLODBIAS,0);
         IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MIPFILTER,D3DTEXF_NONE);
         IDirect3DDevice9_SetSamplerState(d,0,D3DSAMP_MAXMIPLEVEL,0);
+        alphaTest=false;
+        assert(SUCCEEDED(drawPrimitiveUP(d,(D3DPRIMITIVETYPE)4,1,nullptr,12)));
+        assert(first.value==floatBits(15.0f) && first.filter==D3DTEXF_POINT && first.mip==4);
+        alphaBlend=true;
+        assert(SUCCEEDED(drawIndexedPrimitiveUP(d,(D3DPRIMITIVETYPE)4,0,3,1,nullptr,(D3DFORMAT)101,nullptr,12)));
+        assert(first.value==0 && first.filter==D3DTEXF_NONE && first.mip==0);
     }
+    alphaTest=alphaBlend=false;prepareTextureDraw(ctx(d));
+    const DWORD plain[]={0xffff0200u,0x02000001u,0x800f0800u,0xa0e40000u,0xffffu};
+    const DWORD clip[]={0xffff0300u,0x01000041u,0x800f0000u,0xffffu};
+    const DWORD comment[]={0xffff0200u,0x0002fffeu,65u,0xffffu,0xffffu};
+    assert(!needsOriginalCoverage(plain,5) && !needsOriginalCoverage(comment,5));
+    assert(needsOriginalCoverage(clip,4) && needsOriginalCoverage(plain,4));
+    IDirect3DPixelShader9Vtbl coverageTable={};coverageTable.AddRef=shaderAdd;coverageTable.Release=shaderDrop;coverageTable.GetFunction=shaderRead;
+    CoverageShader leafShader={&coverageTable,clip,sizeof(clip),1,0};
+    activeShader=(IDirect3DPixelShader9*)&leafShader;
+    assert(SUCCEEDED(drawPrimitive(d,(D3DPRIMITIVETYPE)4,0,1)));
+    assert(first.value==0 && first.mip==0 && leafShader.reads==2);
+    for(int i=0;i<1000;++i)assert(SUCCEEDED(drawPrimitive(d,(D3DPRIMITIVETYPE)4,0,1)));
+    assert(leafShader.reads==2 && leafShader.refs==2); // Bounded cache owns one ref.
+    activeShader=nullptr;prepareTextureDraw(ctx(d));
+    assert(first.value==floatBits(15.0f) && first.mip==4);
+    failQuery=true;prepareTextureDraw(ctx(d));
+    assert(first.value==0 && first.mip==0); // Unreadable actual state fails closed.
+    failQuery=false;prepareTextureDraw(ctx(d));
+    assert(first.value==floatBits(15.0f) && first.mip==4);
     textureFormat=D3DFMT_X8R8G8B8;
     // Optional filter rejection must preserve the game's valid HRESULT/value.
     IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);
@@ -187,6 +233,8 @@ int main() {
     // Normal/off restores the game's tracked value on the next texture bind.
     ctx(d)->config.enabled=false;IDirect3DDevice9_SetTexture(d,0,(IDirect3DBaseTexture9*)&tex);
     assert(first.value==0);
+    before=stateReads;assert(SUCCEEDED(drawPrimitive(d,(D3DPRIMITIVETYPE)4,0,1)));assert(stateReads==before);
+    clearCutoutBindings(ctx(d));assert(leafShader.refs==1);
     assert(IDirect3DDevice9_Release(d)==0);assert(first.lpVtbl==nullptr); // No read after final Release.
     // Stress device creation and final Release, including allocator-address reuse.
     for(int i=0;i<2000;++i) {

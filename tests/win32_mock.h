@@ -16,6 +16,8 @@ using DWORD=std::uint32_t;using ULONG=std::uint32_t;using LONG=std::int32_t;
 using UINT=unsigned;using HRESULT=std::int32_t;using BOOL=int;using ULONGLONG=std::uint64_t;
 using HMODULE=void*;using HANDLE=void*;using HWND=void*;using HINSTANCE=void*;
 using PVOID=void*;using LPVOID=void*;using LPCWSTR=const wchar_t*;using FARPROC=void(*)();
+using INT=int;using D3DPRIMITIVETYPE=int;using D3DFORMAT=int;using D3DRENDERSTATETYPE=int;
+constexpr int D3DRS_ALPHATESTENABLE=15,D3DRS_ALPHABLENDENABLE=27;
 using REFIID=int;using D3DCOLOR=DWORD;using D3DDEVTYPE=int;using D3DRESOURCETYPE=int;using D3DSAMPLERSTATETYPE=int;
 constexpr HRESULT S_OK=0,E_NOINTERFACE=-1,E_NOTIMPL=-2,D3DERR_DEVICELOST=-3,E_POINTER=-4,D3DERR_INVALIDCALL=-5;
 #define SUCCEEDED(x) ((x)>=0)
@@ -52,7 +54,12 @@ using IDirect3DCubeTexture9=IDirect3DTexture9;
  HRESULT(*CreatePixelShader)(IDirect3DDevice9*,const DWORD*,IDirect3DPixelShader9**); \
  HRESULT(*CreateVertexShader)(IDirect3DDevice9*,const DWORD*,IDirect3DVertexShader9**); \
  HRESULT(*SetPixelShader)(IDirect3DDevice9*,IDirect3DPixelShader9*); \
- HRESULT(*GetPixelShader)(IDirect3DDevice9*,IDirect3DPixelShader9**)
+ HRESULT(*GetPixelShader)(IDirect3DDevice9*,IDirect3DPixelShader9**); \
+ HRESULT(*GetRenderState)(IDirect3DDevice9*,D3DRENDERSTATETYPE,DWORD*); \
+ HRESULT(*DrawPrimitive)(IDirect3DDevice9*,D3DPRIMITIVETYPE,UINT,UINT); \
+ HRESULT(*DrawIndexedPrimitive)(IDirect3DDevice9*,D3DPRIMITIVETYPE,INT,UINT,UINT,UINT,UINT); \
+ HRESULT(*DrawPrimitiveUP)(IDirect3DDevice9*,D3DPRIMITIVETYPE,UINT,const void*,UINT); \
+ HRESULT(*DrawIndexedPrimitiveUP)(IDirect3DDevice9*,D3DPRIMITIVETYPE,UINT,UINT,UINT,const void*,D3DFORMAT,const void*,UINT)
 struct IDirect3DDevice9Vtbl {DEVICE_PREFIX;};
 struct IDirect3DDevice9ExVtbl {DEVICE_PREFIX;HRESULT(*ResetEx)(IDirect3DDevice9Ex*,D3DPRESENT_PARAMETERS*,D3DDISPLAYMODEEX*);};
 struct IDirect3DDevice9 {const IDirect3DDevice9Vtbl*lpVtbl;};

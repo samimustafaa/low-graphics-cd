@@ -1,4 +1,4 @@
-"""CD Texture Lab 1.6.12 — public COM forwarding wrappers, Windows x86 Direct3D 9.
+"""CD Texture Lab 1.6.13 — public COM forwarding wrappers, Windows x86 Direct3D 9.
 
 Python 3.9+ standard library only. No network operations. See README.md.
 """
@@ -207,7 +207,7 @@ def install(folder, dll_bytes):
             raise InstallationConflict(f"{p.name} already exists. Nothing was overwritten. "
                                        "Click Repair installation to back up the existing files and install BOOST.")
     created = []
-    blobs = [dll_bytes, settings(), json.dumps({"app": APP, "build_version": "1.6.12", "dll_sha256": sha(dll_bytes)}, indent=2).encode()]
+    blobs = [dll_bytes, settings(), json.dumps({"app": APP, "build_version": "1.6.13", "dll_sha256": sha(dll_bytes)}, indent=2).encode()]
     try:
         for path, data in zip(targets, blobs):
             with path.open("xb") as f:
@@ -225,8 +225,8 @@ def apply_bias(folder, bias, bypass=False):
         record = owned_manifest(folder)
     except (OSError, ValueError) as exc:
         raise InstallationConflict('The installation record cannot be verified. Click Repair installation.') from exc
-    if bypass and record.get("build_version") != "1.6.12":
-        raise ValueError("Install/update the 1.6.12 helper before using Bypass. Restart the game afterward.")
+    if bypass and record.get("build_version") != "1.6.13":
+        raise ValueError("Install/update the 1.6.13 helper before using Bypass. Restart the game afterward.")
     ini = folder / INI
     if ini.is_symlink() or not ini.is_file() or not ini.read_text(encoding="ascii").startswith(MARKER + "\n"):
         raise ValueError("The settings file is missing or is not owned by this app.")
@@ -257,7 +257,7 @@ def uninstall(folder):
 def diagnostic_payload(exe, events=None):
     """Read only. Collect no memory dump or unrelated Windows events."""
     exe = Path(exe)
-    data = {"system.txt": f"Texture Lab 1.6.12 diagnostic export\nWindows/platform: {platform.platform()}\n"
+    data = {"system.txt": f"Texture Lab 1.6.13 diagnostic export\nWindows/platform: {platform.platform()}\n"
             f"Python: {platform.python_version()} ({struct.calcsize('P') * 8}-bit)\n"
             f"Game executable: {exe}\n"}
     for name in (LOG, INI, MANIFEST):
@@ -313,7 +313,7 @@ def install_or_update(folder, dll_bytes):
     names = (DLL, INI, MANIFEST)
     for name in names:
         shutil.copy2(folder / name, backup / name)
-    blobs = (dll_bytes, ini.read_bytes(), json.dumps({"app": APP, "build_version": "1.6.12", "dll_sha256": sha(dll_bytes)}, indent=2).encode())
+    blobs = (dll_bytes, ini.read_bytes(), json.dumps({"app": APP, "build_version": "1.6.13", "dll_sha256": sha(dll_bytes)}, indent=2).encode())
     try:
         for name, blob in zip(names, blobs):
             _atomic_write(folder / name, blob)
@@ -354,7 +354,7 @@ def save_preset(folder, mode, enabled=True, bypass=False, neutral_sky=None, allo
     data = settings(mode, bypass=bypass, neutral_sky=neutral_sky, allow_mipmaps=allow_mipmaps, collect_stats=collect_stats, black_sky=black_sky, flat_ground=flat_ground, opaque_structures=opaque_structures)
     if not enabled: data = data.replace(b"Enabled=1", b"Enabled=0")
     record = owned_manifest(Path(folder))
-    if record.get("build_version") != "1.6.12":
+    if record.get("build_version") != "1.6.13":
         raise ValueError("Click Install / update first to replace the old helper.")
     current = Path(folder) / DLL
     if current.is_symlink() or not current.is_file() or sha(current.read_bytes()) != record["dll_sha256"]:

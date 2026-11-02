@@ -1,4 +1,4 @@
-// Texture Lab 1.6.12. Public COM forwarding wrappers. System objects, private
+// Texture Lab 1.6.13. Public COM forwarding wrappers. System objects, private
 // runtime layouts and runtime vtables are never modified. Original MIT source.
 #define CINTERFACE
 #define COBJMACROS
@@ -48,7 +48,7 @@ static BOOL CALLBACK initialize(PINIT_ONCE, PVOID, PVOID*) {
     HMODULE pinned;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,
                       (LPCWSTR)selfModule,&pinned);
-    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.6.12 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
+    char line[160]; snprintf(line,sizeof(line),"TextureLab 1.6.13 loaded pid=%lu system_runtime=%s",GetCurrentProcessId(),systemD3D?"ok":"FAILED");
     logLine(line); return TRUE;
 }
 static FARPROC resolve(const char* name) {
@@ -83,9 +83,10 @@ constexpr size_t deviceSlots=sizeof(IDirect3DDevice9ExVtbl)/sizeof(void*);
 constexpr size_t factorySlots=sizeof(IDirect3D9ExVtbl)/sizeof(void*);
 struct Sampler {
     DWORD requested; bool applied; DWORD appliedValue;
-    bool eligible, filterApplied; DWORD requestedFilter, appliedFilter;
+    bool eligible, baseEligible, filterApplied; DWORD requestedFilter, appliedFilter;
     DWORD requestedMip, appliedMip; bool mipApplied; UINT maxMip;
 };
+struct CutoutBinding {IDirect3DPixelShader9* source;bool protect;};
 struct SkyBinding {IDirect3DPixelShader9* source;IDirect3DPixelShader9* replacement;};
 struct DeviceContext {
     const IDirect3DDevice9Vtbl* lpVtbl;
@@ -96,6 +97,8 @@ struct DeviceContext {
     unsigned long eligibleBinds, modifications, failures, otherThread, shaderChecks, graySkies, lateBiasWrites, disabledMipWrites, mipChanges, noMipBinds, mipFloorChanges, flatGrounds, hiddenGrass;
     Sampler samplers[16];
     SkyBinding skyBindings[256];
+    CutoutBinding cutoutBindings[256];
+    bool cutoutDraw;
     unsigned long skyBindReads, skyBindMatches, skyBindMisses;
 };
 struct FactoryContext {
@@ -269,18 +272,6 @@ static void applyMip(DeviceContext* c,DWORD slot,bool eligible) {
         logLine("Close-range mip limit rejected; original level retained and option suspended.");
     }
 }
-// Only reduce formats whose color channels are explicitly opaque. In particular,
-// DXT1 may contain 1-bit leaf coverage; never assume it is an opaque format.
-// Alpha, luminance/mask, compressed and unknown formats keep all game sampler
-// values. This is mandatory, including old INIs with aggressive mip limits.
-static bool canReduceFormat(DWORD format) {
-    switch(format) {
-        case D3DFMT_R8G8B8: case D3DFMT_X8R8G8B8: case D3DFMT_R5G6B5:
-        case D3DFMT_X1R5G5B5: case D3DFMT_R3G3B2: case D3DFMT_X4R4G4B4:
-        case D3DFMT_X8B8G8R8:return true;
-        default:return false;
-    }
-}
 static HRESULT STDMETHODCALLTYPE texture(IDirect3DDevice9* d,DWORD slot,IDirect3DBaseTexture9* t) {
     auto c=ctx(d); Hold<DeviceContext> hold(c); CallGuard entry;
     HRESULT hr=c->original->SetTexture(c->real,slot,t);
@@ -289,7 +280,7 @@ static HRESULT STDMETHODCALLTYPE texture(IDirect3DDevice9* d,DWORD slot,IDirect3
     bool eligible=false;
     // Normal/off sessions avoid metadata queries entirely.
     if(!c->config.enabled || !c->config.bias) {
-        auto& state=c->samplers[slot];state.eligible=false;
+        auto& state=c->samplers[slot];state.eligible=state.baseEligible=false;
         if(state.applied && state.appliedValue!=state.requested)apply(c,slot,state.requested);
         applyFilter(c,slot,false);applyMip(c,slot,false);return hr;
     }
@@ -302,14 +293,16 @@ static HRESULT STDMETHODCALLTYPE texture(IDirect3DDevice9* d,DWORD slot,IDirect3
             IDirect3DCubeTexture9_GetLevelDesc((IDirect3DCubeTexture9*)t,0,&desc):
             IDirect3DTexture9_GetLevelDesc((IDirect3DTexture9*)t,0,&desc);
         if(SUCCEEDED(description))
-            eligible=canReduceFormat(desc.Format) && !(desc.Usage&(D3DUSAGE_RENDERTARGET|D3DUSAGE_DEPTHSTENCIL)) &&
+            eligible=!(desc.Usage&(D3DUSAGE_RENDERTARGET|D3DUSAGE_DEPTHSTENCIL)) &&
                 (!(desc.Usage&D3DUSAGE_AUTOGENMIPMAP) || c->config.includeAutogen) &&
                 (levels>1 || (c->config.includeAutogen && (desc.Usage&D3DUSAGE_AUTOGENMIPMAP))) &&
                 desc.Width>=c->config.minSize && desc.Height>=c->config.minSize;
     }
     if(eligible) ++c->eligibleBinds;else if(t && levels<=1)++c->noMipBinds;
+    c->samplers[slot].baseEligible=eligible;
+    eligible=eligible && !c->cutoutDraw;
     c->samplers[slot].eligible=eligible;
-    c->samplers[slot].maxMip=eligible && levels>1?levels-1:0;
+    c->samplers[slot].maxMip=c->samplers[slot].baseEligible && levels>1?levels-1:0;
     auto& sampler=c->samplers[slot]; DWORD value=desired(c,slot,eligible);
     // Write on eligible binds (state blocks may change actual runtime values).
     // Restore only if this helper has previously changed this sampler.
@@ -358,6 +351,8 @@ static HRESULT STDMETHODCALLTYPE sampler(IDirect3DDevice9* d,DWORD slot,D3DSAMPL
     return hr;
 }
 
+#include "foliage_sampling.inc"
+
 static HRESULT STDMETHODCALLTYPE beginBlock(IDirect3DDevice9* d) {
     auto c=ctx(d); Hold<DeviceContext> hold(c);
     // Restore our own overrides before recording starts, so state blocks do
@@ -367,18 +362,18 @@ static HRESULT STDMETHODCALLTYPE beginBlock(IDirect3DDevice9* d) {
             auto& state=c->samplers[slot];
             if(state.applied && state.appliedValue!=state.requested)apply(c,slot,state.requested);
             if(!c->blocked){applyFilter(c,slot,false);applyMip(c,slot,false);}
-            state.eligible=false;
+            state.eligible=state.baseEligible=false;
         }
     }
-    HRESULT hr=c->original->BeginStateBlock(c->real); if(SUCCEEDED(hr)){InterlockedExchange(&c->recording,1);for(auto& s:c->samplers)s.eligible=false;} return hr;
+    HRESULT hr=c->original->BeginStateBlock(c->real); if(SUCCEEDED(hr)){InterlockedExchange(&c->recording,1);for(auto& s:c->samplers)s.eligible=s.baseEligible=false;} return hr;
 }
 static HRESULT STDMETHODCALLTYPE endBlock(IDirect3DDevice9* d,IDirect3DStateBlock9** out) {
     auto c=ctx(d); Hold<DeviceContext> hold(c);
-    HRESULT hr=c->original->EndStateBlock(c->real,out); if(SUCCEEDED(hr)){InterlockedExchange(&c->recording,0);for(auto& s:c->samplers){s.eligible=false;s.applied=false;s.filterApplied=false;s.mipApplied=false;}} return hr;
+    HRESULT hr=c->original->EndStateBlock(c->real,out); if(SUCCEEDED(hr)){InterlockedExchange(&c->recording,0);for(auto& s:c->samplers){s.eligible=s.baseEligible=false;s.applied=false;s.filterApplied=false;s.mipApplied=false;}} return hr;
 }
 static void afterReset(DeviceContext* c,HRESULT hr) {
     if(SUCCEEDED(hr)) {
-        memset(c->samplers,0,sizeof(c->samplers)); InterlockedExchange(&c->recording,0);
+        memset(c->samplers,0,sizeof(c->samplers));c->cutoutDraw=false; InterlockedExchange(&c->recording,0);
         InterlockedExchange(&c->renderThread,0); InterlockedExchange(&c->blocked,0);
         logLine("Device reset succeeded; bias tracking reset.");
     } else logLine("Device reset failed; extra texture calls remain disabled.");
@@ -397,7 +392,7 @@ static ULONG STDMETHODCALLTYPE releaseDevice(IDirect3DDevice9* d) {
     ULONG refs=(ULONG)InterlockedDecrement(&c->refs);
     if(!refs){
         if(c->config.neutralSky || c->config.opaqueStructures){char summary[160];snprintf(summary,sizeof(summary),"Sky bind summary: reads=%lu matches=%lu unknown=%lu",c->skyBindReads,c->skyBindMatches,c->skyBindMisses);logLine(summary);}
-        clearSkyBindings(c);InterlockedExchange(&c->dead,1);
+        clearCutoutBindings(c);clearSkyBindings(c);InterlockedExchange(&c->dead,1);
     }
     c->original->Release(c->real);return refs;
 }
@@ -442,6 +437,7 @@ static ULONG STDMETHODCALLTYPE releaseFactory(IDirect3D9* d) {
 static void fillDeviceTable(DeviceContext* c) {
     IDirect3DDevice9ExVtbl t={}; t.QueryInterface=queryDevice;t.AddRef=addDevice;t.Release=releaseDevice;
     t.SetTexture=texture;t.SetSamplerState=sampler;t.Reset=reset;t.ResetEx=resetEx;
+    t.DrawPrimitive=drawPrimitive;t.DrawIndexedPrimitive=drawIndexedPrimitive;t.DrawPrimitiveUP=drawPrimitiveUP;t.DrawIndexedPrimitiveUP=drawIndexedPrimitiveUP;
     t.BeginStateBlock=beginBlock;t.EndStateBlock=endBlock;t.CreatePixelShader=createPixelShader;t.CreateVertexShader=createVertexShader;t.SetPixelShader=setPixelShader;t.GetPixelShader=getPixelShader; memcpy(c->entries,&t,sizeof(t));
 }
 static void fillFactoryTable(FactoryContext* c) {

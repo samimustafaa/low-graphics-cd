@@ -5,7 +5,7 @@ Lower graphics for Creative Destruction, made for low-end PCs and laptops.
 ## What it does
 
 - Three presets: Normal, Low, and Ultra.
-- Leaf and transparency-bearing textures retain their original sampling in every preset.
+- Leaves and other cutout/transparent materials keep original sampling. Low and Ultra still reduce opaque materials, including compressed textures.
 - Separate sky choices: Normal (blue) or Sky Gray.
 - Optional grass removal, flat ground, and experimental opaque structures in Ultra.
 - Shows which preset you applied.
