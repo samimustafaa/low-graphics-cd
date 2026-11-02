@@ -28,4 +28,4 @@ if len(sys.argv)==3 and sys.argv[1]=='--parent':
     else:raise ValueError('Unknown probe mode')
 else:
     config=json.loads(Path(os.environ['TEXTURELAB_PROBE_CONFIG']).read_text())
-    Path(config['child_report']).write_text(json.dumps({'bundle':sys._MEIPASS,'executable':sys.executable,'runtime_exists':(Path(sys._MEIPASS)/'python312.dll').is_file()}))
+    Path(config['child_report']).write_text(json.dumps({'bundle':sys._MEIPASS,'executable':sys.executable,'runtime_exists':(Path(sys._MEIPASS)/'python312.dll').is_file(),'pid':os.getpid(),'bootloader_pid':os.getppid()}))

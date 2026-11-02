@@ -6,6 +6,23 @@ import shutil
 import subprocess
 import tempfile
 import time
+import ctypes
+from ctypes import wintypes
+
+kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+kernel.OpenProcess.argtypes=[wintypes.DWORD,wintypes.BOOL,wintypes.DWORD]
+kernel.OpenProcess.restype=wintypes.HANDLE
+kernel.WaitForSingleObject.argtypes=[wintypes.HANDLE,wintypes.DWORD]
+kernel.WaitForSingleObject.restype=wintypes.DWORD
+kernel.CloseHandle.argtypes=[wintypes.HANDLE]
+def wait_for_exit(pid):
+    handle=kernel.OpenProcess(0x100000,False,pid)
+    if not handle:
+        error=ctypes.get_last_error()
+        if error==87:return # Process already exited.
+        raise ctypes.WinError(error)
+    try:assert kernel.WaitForSingleObject(handle,45000)==0,('Updated probe still running',pid)
+    finally:kernel.CloseHandle(handle)
 
 probe=Path('build/update-probe/dist/FrozenUpdateProbe.exe').resolve()
 installer=Path('build/update-probe/installer/FrozenUpdateProbe-Setup.exe').resolve()
@@ -64,6 +81,11 @@ for mode in ('fixed_portable','dirty_native_portable','fixed_installed','legacy_
         assert first['bundle']!=second['bundle'],mode
         until(lambda:not Path(first['bundle']).exists())
         until(lambda:not Path(second['bundle']).exists())
+        # _MEI removal precedes the outer one-file bootloader's process exit.
+        # Wait for both child processes before deleting/uninstalling the EXE;
+        # otherwise Windows may still hold its image mapped (WinError 5).
+        wait_for_exit(second['pid'])
+        wait_for_exit(second['bootloader_pid'])
         assert Path(second['executable']).resolve()==target.resolve()
         if portable:assert Path(str(target)+'.previous').is_file()
         else:
