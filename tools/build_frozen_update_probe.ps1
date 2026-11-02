@@ -10,7 +10,7 @@ $source = Join-Path $PWD 'packaging'
 # Compile the actual production installer script with only its source EXE and
 # output directory changed. The [Run]/PrepareAppLaunch logic stays identical.
 $text = Get-Content packaging/TextureLab.iss -Raw
-$text = $text.Replace('[Setup]', "[Setup]`nSourceDir=$source")
+$text = $text.Replace('[Setup]', "[Setup]`nSourceDir=$source`nSetupLogging=yes")
 $text = $text.Replace('Source: "..\dist\TextureLab\*"', "Source: `"$probe`"")
 $fixture = Join-Path $PWD 'build\update-probe\probe.iss'
 $text | Set-Content $fixture

@@ -34,7 +34,28 @@ for mode in ('fixed_portable','dirty_native_portable','fixed_installed','legacy_
             if key.startswith('_PYI_') or key=='_MEIPASS2':del env[key]
         env['PYINSTALLER_RESET_ENVIRONMENT']='1'
         parent=subprocess.Popen([str(target),'--parent',str(path)],env=env)
-        assert parent.wait(timeout=30)==0,mode
+        print(f'START: {mode}, frozen parent pid={parent.pid}',flush=True)
+        try:
+            try:
+                exit_code=parent.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                # Shared Windows runners can spend longer than 30 seconds in
+                # installer startup or the one-file bootloader's cleanup. Log
+                # progress before allowing a bounded additional 60 seconds;
+                # all fresh-runtime/relaunch/cleanup assertions still apply.
+                for name in ('parent_report','child_report'):
+                    report=Path(config[name])
+                    print(f'WAIT: {mode} {name}: {report.read_text() if report.exists() else "not written"}',flush=True)
+                exit_code=parent.wait(timeout=60)
+            assert exit_code==0,(mode,exit_code)
+        except BaseException:
+            for log in sorted(Path(tempfile.gettempdir()).glob('Setup Log*.txt'),key=lambda p:p.stat().st_mtime)[-2:]:
+                print(f'INSTALLER LOG: {log}\n{log.read_text(errors="replace")[-10000:]}',flush=True)
+            # Kill only the process tree created by this fixture, so a failed
+            # assertion is not hidden by TemporaryDirectory's locked-file error.
+            subprocess.run(['taskkill','/PID',str(parent.pid),'/T','/F'],capture_output=True)
+            parent.wait(timeout=10)
+            raise
         until(lambda:Path(config['parent_report']).is_file())
         first=json.loads(Path(config['parent_report']).read_text())
         until(lambda:Path(config['child_report']).is_file())
